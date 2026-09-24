@@ -69,3 +69,13 @@ def test_failed_node_reports_node_error(d):
     res, _ = result(d, "node.apply", {"op": op_to_json(call("n1", "astype", dtype={"b": "int64"}))})
     env, _ = d.handle(req("node.summary", {"id": res["node"]["id"]}), [])
     assert env["error"]["code"] == "node_error"
+
+
+@pytest.mark.parametrize(
+    "params",
+    [{"id": "n1", "offset": "abc"}, {"id": "n1", "limit": -5}, {"id": "n1", "col_stop": "x"}, {}],
+)
+def test_bad_window_params_are_bad_requests(d, params):
+    env, _ = d.handle(req("node.window", params), [])
+    assert env["error"]["code"] in ("bad_request", "unknown_node")
+    assert env["error"]["code"] != "internal"

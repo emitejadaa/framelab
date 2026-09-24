@@ -144,3 +144,13 @@ def test_snapshot_lists_nodes(session):
         "name_auto": False,
         "shape": [4, 3],
     }
+
+
+def test_a_failing_listener_does_not_break_computation(session):
+    def boom(method, params):
+        raise RuntimeError("listener bug")
+
+    session.subscribe(boom)
+    node = session.apply(call("n1", "head", n=1))
+    assert len(session.wait(node.id, timeout=5)) == 1
+    assert session.node(node.id).state is NodeState.READY

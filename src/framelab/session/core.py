@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import secrets
 import threading
 import traceback
@@ -22,6 +23,8 @@ from ..protocol.schema import SessionSnapshot
 from .node import ErrorDetail, Node, NodeError, NodeState, NotReady, UnknownNode, classify
 
 __all__ = ["Session"]
+
+log = logging.getLogger("framelab")
 
 Listener = Callable[[str, dict[str, Any]], None]
 _DEAD = (NodeState.ERROR, NodeState.BLOCKED)
@@ -267,7 +270,10 @@ class Session:
 
     def _emit(self, method: str, params: dict[str, Any]) -> None:
         for listener in list(self._listeners):
-            listener(method, params)
+            try:
+                listener(method, params)
+            except Exception:  # a broken listener must never stall the graph
+                log.exception("framelab: event listener failed on %s", method)
 
     def snapshot(self) -> SessionSnapshot:
         with self._lock:
