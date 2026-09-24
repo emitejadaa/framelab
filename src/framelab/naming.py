@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import builtins
+import inspect
 import keyword
 import re
 from collections.abc import Iterable, Mapping, Sequence
@@ -18,6 +19,7 @@ __all__ = [
     "sanitize_identifier",
     "scan_frame_for",
     "unique_name",
+    "user_frame",
 ]
 
 DEFAULT_ROOT_NAME = "df"
@@ -67,7 +69,35 @@ def scan_frame_for(obj: Any, frame: Any) -> list[str]:
     return names
 
 
-def _call_node(frame: Any) -> ast.Call | None:
+def user_frame(frame: Any) -> Any:
+    """Skip pandas-internal frames, so ``df.pipe(fl.explore)`` names ``df``, not ``obj``."""
+    while frame is not None and frame.f_globals.get("__name__", "").startswith("pandas."):
+        frame = frame.f_back
+    return frame
+
+
+def _static_lookup(expr: ast.expr, frame: Any) -> Any:
+    """Value of a name or dotted attribute chain without running any user code."""
+    if isinstance(expr, ast.Name):
+        for scope in (frame.f_locals, frame.f_globals, vars(builtins)):
+            if expr.id in scope:
+                return scope[expr.id]
+        raise LookupError(expr.id)
+    if isinstance(expr, ast.Attribute):
+        return inspect.getattr_static(_static_lookup(expr.value, frame), expr.attr)
+    raise LookupError("not a plain name")
+
+
+def _refers_to(expr: ast.expr, frame: Any, target: Any) -> bool:
+    """Whether ``expr`` statically names ``target`` (unwrapping decorators)."""
+    try:
+        value = _static_lookup(expr, frame)
+    except Exception:
+        return False  # e.g. functools.partial(explore): cannot prove it
+    return callable(value) and inspect.unwrap(value) is inspect.unwrap(target)
+
+
+def _executing_call(frame: Any) -> ast.Call | None:
     try:
         import executing
 
@@ -75,6 +105,18 @@ def _call_node(frame: Any) -> ast.Call | None:
     except Exception:
         return None
     return node if isinstance(node, ast.Call) else None
+
+
+def _pipe_receiver(call: ast.Call, frame: Any, callee: Any) -> ast.expr | None:
+    """``ventas.pipe(fl.explore)`` -> the ``ventas`` expression.
+
+    pandas 3 hands pipe'd functions a shallow copy, so the identity scan cannot find it.
+    """
+    func = call.func
+    is_pipe = isinstance(func, ast.Attribute) and func.attr == "pipe" and bool(call.args)
+    if is_pipe and _refers_to(call.args[0], frame, callee):
+        return func.value
+    return None
 
 
 def _is_simple_access(expr: ast.expr) -> bool:
@@ -99,11 +141,21 @@ def resolve_root_names(
     kwargs: Mapping[str, Any],
     frame: Any,
     explicit_name: str | None = None,
+    callee: Any = None,
 ) -> list[RootSpec]:
     """Name every root passed to ``explore()`` as the user wrote it in their code."""
     if explicit_name is not None and len(args) != 1:
         raise ValueError("name= can only be used with exactly one positional DataFrame")
-    call = _call_node(frame) if frame is not None else None
+    raw_call = _executing_call(frame) if frame is not None else None
+    call: ast.Call | None = None
+    pipe_receiver: ast.expr | None = None
+    if raw_call is not None:
+        # When C code (sorted, max, map, ...) or pipe() calls explore, executing reports
+        # the *outer* call, whose arguments are not the roots.
+        if callee is None or _refers_to(raw_call.func, frame, callee):
+            call = raw_call
+        elif len(args) == 1 and not kwargs:
+            pipe_receiver = _pipe_receiver(raw_call, frame, callee)
     positional: list[ast.expr] | None = None
     keyword_exprs: dict[str, ast.expr] = {}
     if call is not None and not any(isinstance(a, ast.Starred) for a in call.args):
@@ -117,6 +169,9 @@ def resolve_root_names(
             raw.append((sanitize_identifier(explicit_name), obj, None))
         elif positional is not None:
             name, src = _name_for_expr(positional[i])
+            raw.append((name, obj, src))
+        elif pipe_receiver is not None:
+            name, src = _name_for_expr(pipe_receiver)
             raw.append((name, obj, src))
         else:
             found = scan_frame_for(obj, frame) if frame is not None else []

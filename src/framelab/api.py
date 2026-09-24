@@ -9,7 +9,7 @@ from typing import Any
 
 from ._paths import require_static
 from .env import INLINE_ENVS, detect_env, resolve_mode
-from .naming import resolve_root_names
+from .naming import resolve_root_names, user_frame
 from .options import registry
 from .session import Session
 from .transport.dispatcher import Dispatcher
@@ -45,9 +45,9 @@ def explore(*dfs: Any, name: str | None = None, mode: str | None = None, **named
     global _last_session
     if not dfs and not named:
         raise TypeError("explore() needs at least one DataFrame or Series")
-    frame = sys._getframe(1)
+    frame = user_frame(sys._getframe(1))
     try:
-        specs = resolve_root_names(dfs, named, frame, explicit_name=name)
+        specs = resolve_root_names(dfs, named, frame, explicit_name=name, callee=explore)
     finally:
         del frame
     session = Session(specs, registry)

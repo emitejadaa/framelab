@@ -1,3 +1,4 @@
+import functools
 import sys
 
 import pandas as pd
@@ -9,11 +10,13 @@ from framelab.naming import (
     sanitize_identifier,
     scan_frame_for,
     unique_name,
+    user_frame,
 )
 
 
 def fake_explore(*args, name=None, **kwargs):
-    return resolve_root_names(args, kwargs, sys._getframe(1), explicit_name=name)
+    frame = user_frame(sys._getframe(1))
+    return resolve_root_names(args, kwargs, frame, explicit_name=name, callee=fake_explore)
 
 
 @pytest.fixture
@@ -115,3 +118,31 @@ def test_nothing_found_defaults_to_df():
     ns = {"fake_explore": fake_explore, "pd": pd}
     exec("result = fake_explore(pd.DataFrame({'a': [1]}))", ns)
     assert ns["result"][0].name == "df"
+
+
+captured = []
+
+
+def capturing_explore(*args, **kwargs):
+    frame = user_frame(sys._getframe(1))
+    captured.append(resolve_root_names(args, kwargs, frame, callee=capturing_explore))
+    return 0
+
+
+def test_used_as_sort_key_is_not_named_after_the_outer_call(ventas):
+    # sorted() is C code, so executing reports sorted(one, ...) itself; its first
+    # argument is the list, not the DataFrame -> must fall back to the identity scan.
+    captured.clear()
+    one = [ventas]
+    sorted(one, key=capturing_explore)
+    assert captured[-1][0].name == "ventas"
+
+
+def test_partial_falls_back_to_identity_scan(ventas):
+    specs = functools.partial(fake_explore)(ventas)
+    assert specs[0].name == "ventas"
+
+
+def test_pipe_skips_pandas_internal_frames(ventas):
+    specs = ventas.pipe(fake_explore)
+    assert specs[0].name == "ventas"
