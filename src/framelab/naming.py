@@ -11,8 +11,13 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
+from .codegen.literals import label_text
+
 __all__ = [
     "DEFAULT_ROOT_NAME",
+    "MAX_NAME",
+    "OP_ALIASES",
+    "auto_node_name",
     "RESERVED_NAMES",
     "RootSpec",
     "resolve_root_names",
@@ -192,3 +197,59 @@ def resolve_root_names(
             src = name
         out.append(RootSpec(final, obj, src))
     return out
+
+
+MAX_NAME = 30
+OP_ALIASES = {
+    "sort_values": "sorted",
+    "sort_index": "sorted",
+    "drop_duplicates": "dedup",
+    "fillna": "filled",
+    "rename": "renamed",
+    "drop": "dropped",
+    "astype": "typed",
+    "describe": "desc",
+    "value_counts": "counts",
+    "reset_index": "reset",
+    "set_index": "indexed",
+    "merge": "merged",
+}
+
+
+def _slug(text: str) -> str:
+    return re.sub(r"\W+", "_", text).strip("_") or "col"
+
+
+def _first_label(value: Any) -> Any:
+    items = getattr(value, "items", None)
+    if isinstance(items, tuple) and items:
+        return _first_label(items[0])
+    return getattr(value, "label", getattr(value, "value", value))
+
+
+def auto_node_name(op: Any, names: Mapping[str, str], taken: Iterable[str]) -> str:
+    """Name for a new node: ``{parent}_{alias}``, short, unique and a valid identifier."""
+    taken = set(taken)
+    if op.target is not None:
+        parent = names[op.target]
+    else:
+        refs = op.parents()
+        parent = names[refs[0]] if refs else DEFAULT_ROOT_NAME
+    if op.kind == "setitem":
+        return unique_name(parent, taken)
+    if op.kind == "getitem":
+        alias = "cols" if isinstance(op.key, list) else _slug(label_text(op.key))
+    elif op.kind == "filter":
+        alias = "filt"
+    elif op.kind == "call" and op.name == "groupby" and op.kwargs:
+        by = dict(op.kwargs).get("by")
+        alias = "by_" + _slug(label_text(_first_label(by))) if by is not None else "grouped"
+    elif op.kind == "call" and op.name == "merge" and op.args and hasattr(op.args[0], "id"):
+        alias = names[op.args[0].id]
+    else:
+        alias = OP_ALIASES.get(op.name, op.name)
+    base = f"{parent}_{alias}"
+    if len(base) > MAX_NAME:
+        root = parent.split("_")[0]
+        base = f"{root}_{alias}"[:MAX_NAME].rstrip("_")
+    return unique_name(sanitize_identifier(base), taken)
