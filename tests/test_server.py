@@ -66,15 +66,18 @@ def test_index_requires_token(server):
     assert httpx.get(server.url + "?token=wrong").status_code == 403
 
 
-def test_token_login_sets_cookie_then_serves_index(server):
+def test_token_login_serves_index_sets_cookie_and_strips_token(server):
+    # No redirect: a 303 after a navigation started from the file:// redirect page is
+    # cross-site, so a SameSite=Strict cookie would not be sent on the second hop.
     with httpx.Client() as client:
         r = client.get(server.login_url)
-        assert r.status_code == 303 and r.headers["location"] == "/"
+        assert r.status_code == 200 and "framelab.js" in r.text
+        assert "history.replaceState" in r.text
         set_cookie = r.headers["set-cookie"].lower()
         assert "httponly" in set_cookie and "samesite=strict" in set_cookie
+        assert r.headers["cache-control"] == "no-store"
         r2 = client.get(server.url)
         assert r2.status_code == 200 and "framelab.js" in r2.text
-        assert r2.headers["cache-control"] == "no-store"
 
 
 def test_static_requires_auth_and_blocks_traversal(server):

@@ -22,7 +22,6 @@ from starlette.responses import (
     FileResponse,
     HTMLResponse,
     PlainTextResponse,
-    RedirectResponse,
     Response,
 )
 from starlette.routing import Route, WebSocketRoute
@@ -56,6 +55,7 @@ border-radius:50%;animation:fl-boot-spin .8s linear infinite}}
 <body>
 <div id="app"><div class="fl-boot"><i></i><span>framelab</span></div></div>
 <script type="module">
+if (location.search) history.replaceState(null, "", "/");
 import {{ mountWs }} from "/static/framelab.js";
 const el = document.getElementById("app");
 el.replaceChildren();
@@ -211,11 +211,18 @@ class FramelabServer:
         if query_token is not None:
             if not self._token_matches(query_token):
                 return PlainTextResponse("forbidden", status_code=403)
-            response = RedirectResponse("/", status_code=303)
+            # Serve the page right away instead of redirecting: when the navigation
+            # starts from the file:// redirect page it is cross-site, and a 303 hop
+            # would not carry the SameSite=Strict cookie. The page strips the token
+            # from the address bar; its own requests are same-site and carry it.
+            response = self._index_page()
             response.set_cookie(COOKIE, self.token, httponly=True, samesite="strict", path="/")
             return response
         if not self._token_matches(request.cookies.get(COOKIE)):
             return PlainTextResponse("forbidden", status_code=403)
+        return self._index_page()
+
+    def _index_page(self) -> HTMLResponse:
         return HTMLResponse(
             INDEX_TEMPLATE.format(title=html.escape(self.title)),
             headers={"Cache-Control": "no-store"},
