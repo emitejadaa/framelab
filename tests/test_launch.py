@@ -1,4 +1,5 @@
 import os
+import tempfile
 import threading
 from pathlib import Path
 
@@ -62,7 +63,10 @@ class FakeServer:
         self.login_url = "http://127.0.0.1:1/?token=t"
 
     def write_redirect_file(self):
-        return Path(os.devnull)
+        fd, name = tempfile.mkstemp(suffix=".html")
+        os.close(fd)
+        self.last_redirect = Path(name)
+        return self.last_redirect
 
     def idle_for(self):
         return self._idle
@@ -82,6 +86,8 @@ def test_open_in_browser_waits_for_disconnect_grace():
 
     open_in_browser(server, grace=1.0, opener=opened.append, sleep=fake_sleep)
     assert opened and ticks["n"] >= 4
+    # the redirect file holds the token: it must be gone once the browser is in
+    assert not server.last_redirect.exists()
 
 
 def test_open_in_browser_times_out_without_connection():

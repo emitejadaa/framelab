@@ -1,5 +1,6 @@
 """E2E #1 — a real Chromium boots the real bundle through the token flow; close is detected."""
 
+import os
 import time
 
 import pandas as pd
@@ -31,9 +32,11 @@ def test_real_browser_boots_the_frontend_and_close_is_detected():
     server = FramelabServer(d, require_static())
     server.start()
     redirect = server.write_redirect_file()
-    window = launch_app_window(
-        find_chromium(), redirect.as_uri(), extra_args=["--headless=new", "--disable-gpu"]
-    )
+    args = ["--headless=new", "--disable-gpu"]
+    if os.environ.get("CI"):
+        # Ubuntu 24.04 runners block the unprivileged user namespaces Chrome's sandbox needs.
+        args.append("--no-sandbox")
+    window = launch_app_window(find_chromium(), redirect.as_uri(), extra_args=args)
     try:
         deadline = time.monotonic() + 30
         while "session.snapshot" not in seen and time.monotonic() < deadline:

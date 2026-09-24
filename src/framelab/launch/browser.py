@@ -18,11 +18,15 @@ def open_in_browser(
     sleep: Callable[[float], None] = time.sleep,
 ) -> None:
     redirect = server.write_redirect_file()
-    opener(redirect.as_uri())
-    start = time.monotonic()
-    while not server.ever_connected.is_set():
-        if time.monotonic() - start > first_connect_timeout:
-            raise TimeoutError("the browser never connected to framelab")
-        sleep(poll)
+    try:
+        opener(redirect.as_uri())
+        start = time.monotonic()
+        while not server.ever_connected.is_set():
+            if time.monotonic() - start > first_connect_timeout:
+                raise TimeoutError("the browser never connected to framelab")
+            sleep(poll)
+    finally:
+        # The file carries the token; once the browser is in (or gave up) it must go.
+        redirect.unlink(missing_ok=True)
     while server.idle_for() < grace:
         sleep(poll)

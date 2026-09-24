@@ -162,5 +162,7 @@ def test_stop_releases_port(static_dir):
     srv.start()
     port = srv.port
     srv.stop()
-    with pytest.raises(httpx.ConnectError):
+    assert not srv._thread.is_alive()
+    # Linux/macOS refuse the connection at once; Windows may time out instead.
+    with pytest.raises((httpx.ConnectError, httpx.ConnectTimeout)):
         httpx.get(f"http://127.0.0.1:{port}/", timeout=1)
