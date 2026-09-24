@@ -404,6 +404,12 @@ cierra con verificación + borrado de tests de andamio + resumen breve al usuari
 - **M1a — Núcleo mínimo.** Esquema de op + dataclasses, DAG + estados, codegen paso a paso + ejecución, motor
   (dos carriles) básico, ~20 ops curadas, endpoints de resumen de nodo y ventana Arrow, envoltorio `.framelab`
   (versionado, sin congelar). *Verificar:* pytest de fidelidad sobre las 20 ops.
+  **Entregado (2026-09-24):** ops + valores/expresiones con JSON sin pérdidas; emisor de literales; render
+  display/ejecutado; ejecutor con allowlist de AST; carril de cómputo; sesión con estados, eventos, nombres
+  automáticos y scripts; 33 casos de fidelidad; ventanas Arrow (encoder v2) y resúmenes; métodos
+  `node.apply/summary/window/code`; documento `.framelab` v1. **Seguridad:** `ops/policy.py` bloquea
+  escrituras/`eval`/`query`/`pipe`… y restringe `pd.`/`np.` en el código ejecutado (ops de archivos ajenos).
+  Pendiente para M1b: guarda de agregaciones sobre texto (S3), caché LRU/liberación de resultados.
 - **M2a — Workbench mínimo de punta a punta.** Shell (menú, pestañas, paneles, explorador, inspector con
   mini-preview vía Arrow, código, estado), lienzo con nodos, flujo head(5) completo, copiar código, pestañas
   Tabla/Ploter provisorias para que ▦/▟ funcionen, loader de arranque. *Verificar:* E2E 1–3.
