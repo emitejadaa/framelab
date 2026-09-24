@@ -2,7 +2,8 @@
 
 export const PROTOCOL_VERSION = 1 as const;
 export type MessageType = "req" | "res" | "evt" | "cancel";
-export type RootKind = "DataFrame" | "Series";
+export type NodeKindName = "Unknown" | "DataFrame" | "Series" | "GroupBy" | "Index" | "Value";
+export type NodeStateName = "pending" | "computing" | "ready" | "error" | "blocked";
 
 export interface ErrorInfo {
   code: string;
@@ -34,13 +35,6 @@ export interface HelloResult {
   session_id: string;
 }
 
-export interface RootSummary {
-  id: string;
-  name: string;
-  kind: RootKind;
-  shape: number[];
-}
-
 export interface OptionDescription {
   key: string;
   category: string;
@@ -51,9 +45,27 @@ export interface OptionDescription {
   choices?: unknown[];
 }
 
+export interface NodeErrorInfo {
+  type: string;
+  message: string;
+}
+
+export interface NodeInfo {
+  id: string;
+  name: string;
+  kind: NodeKindName;
+  state: NodeStateName;
+  parents: string[];
+  label: string;
+  name_auto: boolean;
+  shape?: number[];
+  error?: NodeErrorInfo;
+  warnings?: string[];
+}
+
 export interface SessionSnapshot {
   rev: number;
   session_id: string;
-  roots: RootSummary[];
+  nodes: NodeInfo[];
   options: OptionDescription[];
 }

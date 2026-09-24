@@ -5,7 +5,6 @@ from typing import Any, Literal, NotRequired, TypedDict
 PROTOCOL_VERSION = 1
 
 MessageType = Literal["req", "res", "evt", "cancel"]
-RootKind = Literal["DataFrame", "Series"]
 
 
 class ErrorInfo(TypedDict):
@@ -38,13 +37,6 @@ class HelloResult(TypedDict):
     session_id: str
 
 
-class RootSummary(TypedDict):
-    id: str
-    name: str
-    kind: RootKind
-    shape: list[int]
-
-
 class OptionDescription(TypedDict):
     key: str
     category: str
@@ -55,8 +47,30 @@ class OptionDescription(TypedDict):
     choices: NotRequired[list[Any]]
 
 
+NodeKindName = Literal["Unknown", "DataFrame", "Series", "GroupBy", "Index", "Value"]
+NodeStateName = Literal["pending", "computing", "ready", "error", "blocked"]
+
+
+class NodeErrorInfo(TypedDict):
+    type: str
+    message: str
+
+
+class NodeInfo(TypedDict):
+    id: str
+    name: str
+    kind: NodeKindName
+    state: NodeStateName
+    parents: list[str]
+    label: str
+    name_auto: bool
+    shape: NotRequired[list[int]]
+    error: NotRequired[NodeErrorInfo]
+    warnings: NotRequired[list[str]]
+
+
 class SessionSnapshot(TypedDict):
     rev: int
     session_id: str
-    roots: list[RootSummary]
+    nodes: list[NodeInfo]
     options: list[OptionDescription]

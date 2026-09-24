@@ -38,7 +38,7 @@ def test_hello_mismatch():
 
 def test_snapshot():
     env, _ = dispatcher().handle(req("session.snapshot"), [])
-    assert env["result"]["roots"][0]["name"] == "ventas"
+    assert env["result"]["nodes"][0]["name"] == "ventas"
 
 
 def test_unknown_method():

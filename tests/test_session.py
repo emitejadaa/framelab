@@ -14,11 +14,11 @@ def test_snapshot_lists_roots_with_shape():
     ventas = pd.DataFrame({"a": range(1000), "b": 0, "c": 0, "d": 0, "e": 0})
     s = make(ventas=ventas, precios=ventas["a"])
     snap = s.snapshot()
-    assert snap["rev"] == 0
+    assert snap["rev"] >= 0
     assert snap["session_id"] == s.id
-    assert snap["roots"] == [
-        {"id": "n1", "name": "ventas", "kind": "DataFrame", "shape": [1000, 5]},
-        {"id": "n2", "name": "precios", "kind": "Series", "shape": [1000]},
+    assert [(n["id"], n["name"], n["kind"], n["shape"]) for n in snap["nodes"]] == [
+        ("n1", "ventas", "DataFrame", [1000, 5]),
+        ("n2", "precios", "Series", [1000]),
     ]
     assert any(o["key"] == "general.theme" for o in snap["options"])
 

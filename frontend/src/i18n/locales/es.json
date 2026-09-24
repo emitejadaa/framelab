@@ -16,5 +16,14 @@
     "unknown_method": "Solicitud desconocida",
     "bad_request": "Solicitud inválida",
     "protocol_mismatch": "Versiones incompatibles"
+  },
+  "node": {
+    "state": {
+      "pending": "pendiente",
+      "computing": "calculando…",
+      "error": "error",
+      "blocked": "bloqueado",
+      "ready": "listo"
+    }
   }
 }

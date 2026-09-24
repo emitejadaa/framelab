@@ -24,7 +24,7 @@ def test_widget_answers_requests(setup):
     w._on_msg(w, msg, [])
     content, buffers = sent[-1]
     assert content["id"] == "c1"
-    assert content["result"]["roots"][0]["name"] == "ventas"
+    assert content["result"]["nodes"][0]["name"] == "ventas"
     assert buffers is None
 
 

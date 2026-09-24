@@ -29,12 +29,17 @@ export function Shell() {
         {t("workbench.roots")}
       </h2>
       <ul className="fl:flex fl:flex-col fl:gap-1">
-        {snapshot.roots.map((root) => (
-          <li key={root.id} data-testid="root-item" className="fl:font-mono">
-            {root.name} ·{" "}
-            {root.shape.length === 2
-              ? t("workbench.shape", { rows: root.shape[0], cols: root.shape[1] })
-              : t("workbench.rows", { count: root.shape[0] })}
+        {snapshot.nodes.map((node) => (
+          <li key={node.id} data-testid="root-item" className="fl:font-mono">
+            {node.name} ·{" "}
+            {node.shape === undefined
+              ? "—"
+              : node.shape.length === 2
+                ? t("workbench.shape", { rows: node.shape[0], cols: node.shape[1] })
+                : t("workbench.rows", { count: node.shape[0] })}
+            {node.state !== "ready" ? (
+              <span style={{ color: "var(--fl-muted)" }}> · {t(`node.state.${node.state}`)}</span>
+            ) : null}
           </li>
         ))}
       </ul>

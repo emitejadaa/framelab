@@ -44,8 +44,9 @@ def test_explore_window_mode_serves_session_and_returns_it(monkeypatch, ventas, 
     monkeypatch.setattr(api, "_static_dir", lambda: tmp_path)
     session = fl.explore(ventas)
     assert session.names == ["ventas"]
-    assert record["snapshot"]["roots"] == [
-        {"id": "n1", "name": "ventas", "kind": "DataFrame", "shape": [1000, 5]}
+    nodes = record["snapshot"]["nodes"]
+    assert [(n["id"], n["name"], n["kind"], n["shape"]) for n in nodes] == [
+        ("n1", "ventas", "DataFrame", [1000, 5])
     ]
     assert "ventas" in record["title"]
     assert fl.last_session() is session

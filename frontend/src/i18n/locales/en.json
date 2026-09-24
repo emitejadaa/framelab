@@ -16,5 +16,14 @@
     "unknown_method": "Unknown request",
     "bad_request": "Invalid request",
     "protocol_mismatch": "Version mismatch"
+  },
+  "node": {
+    "state": {
+      "pending": "pending",
+      "computing": "computing…",
+      "error": "error",
+      "blocked": "blocked",
+      "ready": "ready"
+    }
   }
 }
