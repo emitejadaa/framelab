@@ -87,3 +87,6 @@ extend-exclude = ["spikes", "*.md"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+
+[tool.hatch.build.hooks.custom]
+path = "hatch_build.py"
