@@ -69,8 +69,22 @@ export function App({ transport }: { transport: Transport }) {
       else if (status === "connecting") state.setConnection("connecting");
     });
     if (transport.status() === "open") void handshake();
+    // Python owns the graph: on node events, re-read the snapshot (debounced).
+    let refresh: ReturnType<typeof setTimeout> | undefined;
+    const offNodes = rpc.onEvent("*", (_params, _buffers, env) => {
+      if (!env.method?.startsWith("node.")) return;
+      clearTimeout(refresh);
+      refresh = setTimeout(() => {
+        void rpc
+          .request<SessionSnapshot>("session.snapshot")
+          .then(({ result }) => state.setSnapshot(result))
+          .catch(() => undefined);
+      }, 50);
+    });
     return () => {
       offStatus();
+      offNodes();
+      clearTimeout(refresh);
       rpc.dispose();
     };
   }, [rpc, store, transport]);

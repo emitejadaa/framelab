@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .. import __version__
+from ..errors import FramelabError
 from ..protocol import PROTOCOL_VERSION, make_error, make_event, make_response
 from ..protocol.schema import Envelope
 from ..session import Session
@@ -45,6 +46,11 @@ class Dispatcher:
         self.register("session.snapshot", lambda params, buffers: self.session.snapshot())
         self.register("app.ping", lambda params, buffers: {"pong": True})
 
+        from .methods import register_session_methods
+
+        register_session_methods(self)
+        self._unsubscribe = session.subscribe(self.emit)
+
     def register(self, method: str, handler: Handler) -> None:
         if method in self._handlers:
             raise ValueError(f"handler for {method!r} already registered")
@@ -65,6 +71,8 @@ class Dispatcher:
             out = handler(env.get("params", {}), buffers)
         except ProtocolMismatch as exc:
             return make_error(msg_id, "protocol_mismatch", str(exc)), []
+        except FramelabError as exc:
+            return make_error(msg_id, exc.code, str(exc)), []
         except Exception as exc:
             message = f"{type(exc).__name__}: {exc}"
             return make_error(msg_id, "internal", message, traceback.format_exc()), []
