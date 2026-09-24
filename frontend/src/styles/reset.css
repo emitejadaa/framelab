@@ -18,6 +18,13 @@
     background: var(--fl-bg);
     -webkit-font-smoothing: antialiased;
   }
+  .fl-root:focus {
+    outline: none;
+  }
+  .fl-root:focus-visible {
+    outline: 2px solid var(--fl-accent);
+    outline-offset: -2px;
+  }
   .fl-root :where(h1, h2, h3, h4, p, ul, ol, figure) {
     margin: 0;
   }

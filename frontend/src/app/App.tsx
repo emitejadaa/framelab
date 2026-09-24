@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { type PointerEvent, useEffect, useMemo, useState } from "react";
 import { I18nextProvider } from "react-i18next";
 import { useStore } from "zustand";
 import { type HelloResult, PROTOCOL_VERSION, type SessionSnapshot } from "../generated/protocol";
@@ -12,6 +12,18 @@ import { Shell } from "./Shell";
 
 function optionValue(snapshot: SessionSnapshot | null, key: string): unknown {
   return snapshot?.options.find((o) => o.key === key)?.value;
+}
+
+const INTERACTIVE = "input, textarea, select, button, a[href], [contenteditable], [tabindex]:not(.fl-root)";
+
+/**
+ * Keep keyboard focus inside the app so host shortcuts stay quiet: JupyterLab ignores
+ * key events whose target is inside [data-lm-suppress-shortcuts], but only if focus
+ * actually moved into the widget (it stays on the notebook cell otherwise).
+ */
+function focusRoot(event: PointerEvent<HTMLDivElement>) {
+  const target = event.target as HTMLElement;
+  if (!target.closest(INTERACTIVE)) event.currentTarget.focus({ preventScroll: true });
 }
 
 function browserLanguages(): readonly string[] {
@@ -72,6 +84,8 @@ export function App({ transport }: { transport: Transport }) {
         <PortalProvider value={portalEl}>
           <div
             className="fl-root"
+            tabIndex={-1}
+            onPointerDown={focusRoot}
             data-theme={theme}
             data-reduce-motion={reduceMotion ? "true" : "false"}
             data-lm-suppress-shortcuts="true"

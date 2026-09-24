@@ -21,7 +21,9 @@ export default defineConfig(({ command }) => ({
       fileName: () => "framelab.js",
       cssFileName: "framelab",
     },
-    rolldownOptions: { output: { codeSplitting: false } },
+    // Library mode keeps ES output unminified; the whole bundle travels in every
+    // notebook widget's comm_open, so minify it at the Rolldown level.
+    rolldownOptions: { output: { codeSplitting: false, minify: true } },
   },
   server: {
     port: 5173,
