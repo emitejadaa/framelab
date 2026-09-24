@@ -1,0 +1,20 @@
+{
+  "app": {
+    "connecting": "Connecting…",
+    "protocolMismatch": "This framelab window does not match the installed Python package. Close it and run explore() again.",
+    "error": "Something went wrong"
+  },
+  "workbench": {
+    "roots": "Data",
+    "shape": "{{rows}} × {{cols}}",
+    "rows": "{{count}} rows"
+  },
+  "errors": {
+    "timeout": "The request took too long",
+    "closed": "The connection was closed",
+    "internal": "Internal error",
+    "unknown_method": "Unknown request",
+    "bad_request": "Invalid request",
+    "protocol_mismatch": "Version mismatch"
+  }
+}

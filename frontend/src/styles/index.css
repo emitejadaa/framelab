@@ -1,0 +1,11 @@
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme) prefix(fl);
+@import "tailwindcss/utilities.css" layer(utilities) prefix(fl);
+@import "../theme/tokens.css";
+@import "./reset.css";
+
+@keyframes fl-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

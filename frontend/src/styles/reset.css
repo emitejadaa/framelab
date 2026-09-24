@@ -1,0 +1,41 @@
+/* A reset scoped to .fl-root — framelab never ships a global Preflight. */
+@layer base {
+  .fl-root,
+  .fl-root *,
+  .fl-root *::before,
+  .fl-root *::after {
+    box-sizing: border-box;
+  }
+  .fl-root {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: var(--fl-font-sans);
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--fl-fg);
+    background: var(--fl-bg);
+    -webkit-font-smoothing: antialiased;
+  }
+  .fl-root :where(h1, h2, h3, h4, p, ul, ol, figure) {
+    margin: 0;
+  }
+  .fl-root :where(ul, ol) {
+    padding: 0;
+    list-style: none;
+  }
+  .fl-root :where(button, input, select, textarea) {
+    font: inherit;
+    color: inherit;
+  }
+  .fl-root :where(button) {
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+  }
+  .fl-root :where(code, pre, kbd) {
+    font-family: var(--fl-font-mono);
+  }
+}

@@ -1,0 +1,50 @@
+/* Design tokens, scoped to .fl-root so nothing leaks into JupyterLab / VS Code. */
+.fl-root {
+  --fl-bg: #fafafa;
+  --fl-panel: #ffffff;
+  --fl-fg: #18181b;
+  --fl-muted: #71717a;
+  --fl-border: #e4e4e7;
+  --fl-hover: #f4f4f5;
+  --fl-accent: #3b82f6;
+  --fl-accent-fg: #ffffff;
+  --fl-danger: #dc2626;
+  --fl-warning: #d97706;
+  --fl-font-sans: "Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --fl-font-mono: "JetBrains Mono Variable", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --fl-radius: 6px;
+  --fl-duration: 150ms;
+  color-scheme: light;
+}
+
+.fl-root[data-theme="dark"] {
+  --fl-bg: #18181b;
+  --fl-panel: #1f1f23;
+  --fl-fg: #f4f4f5;
+  --fl-muted: #a1a1aa;
+  --fl-border: #2e2e33;
+  --fl-hover: #27272a;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  .fl-root[data-theme="system"] {
+    --fl-bg: #18181b;
+    --fl-panel: #1f1f23;
+    --fl-fg: #f4f4f5;
+    --fl-muted: #a1a1aa;
+    --fl-border: #2e2e33;
+    --fl-hover: #27272a;
+    color-scheme: dark;
+  }
+}
+
+.fl-root[data-reduce-motion="true"] {
+  --fl-duration: 0ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fl-root {
+    --fl-duration: 0ms;
+  }
+}
