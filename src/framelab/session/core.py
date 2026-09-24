@@ -42,6 +42,7 @@ class Session:
         self._listeners: list[Listener] = []
         self._next = 1
         self._lane = ComputeLane()
+        self._encoders: dict[str, Any] = {}
         self.widget: Any = None
         for spec in roots:
             if not isinstance(spec.obj, (pd.DataFrame, pd.Series)):
@@ -221,6 +222,38 @@ class Session:
         from ..codegen.script import node_script
 
         return node_script(self, key, mode=mode)
+
+    def window(
+        self,
+        key: str,
+        offset: int = 0,
+        limit: int = 200,
+        col_start: int = 0,
+        col_stop: int | None = None,
+        timeout: float = 30.0,
+    ) -> tuple[bytes, dict]:
+        """Arrow IPC bytes + metadata for a block of rows (and optionally of columns)."""
+        from ..table import NotTabular, WindowEncoder, to_frame
+
+        nid = self._resolve(key)
+        value = self.wait(nid, timeout)
+        with self._lock:
+            encoder = self._encoders.get(nid)
+            if encoder is None:
+                frame = to_frame(value)
+                if frame is None:
+                    raise NotTabular(f"{self._nodes[nid].name} is not a table")
+                encoder = self._encoders[nid] = WindowEncoder(frame)
+        return encoder.encode(offset, limit, col_start, col_stop)
+
+    def summary(self, key: str, timeout: float = 30.0) -> dict:
+        from ..table import summarize
+
+        nid = self._resolve(key)
+        out = summarize(self.wait(nid, timeout))
+        out["id"] = nid
+        out["name"] = self._nodes[nid].name
+        return out
 
     # ---- events and snapshot -----------------------------------------------------------------
     def subscribe(self, listener: Listener) -> Callable[[], None]:
