@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 
 from ..errors import FramelabError
+from ..ops.policy import MODULE_ATTRS, method_allowed
 
 __all__ = ["MODULES", "UnsafeCode", "run_statement", "validate_code"]
 
@@ -81,6 +82,13 @@ def validate_code(code: str, readable: set[str], result: str) -> ast.Module:
             raise UnsafeCode(f"{type(node).__name__} is not allowed in generated code")
         if isinstance(node, ast.Attribute) and node.attr.startswith("_"):
             raise UnsafeCode(f"private attribute {node.attr!r} is not allowed")
+        if isinstance(node, ast.Attribute):
+            owner = node.value.id if isinstance(node.value, ast.Name) else None
+            if owner in MODULE_ATTRS:
+                if node.attr not in MODULE_ATTRS[owner]:
+                    raise UnsafeCode(f"{owner}.{node.attr} is not allowed")
+            elif not method_allowed(node.attr):
+                raise UnsafeCode(f"{node.attr!r} is not allowed (it could write files or run code)")
         reads = isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load)
         if reads and node.id not in readable and node.id != result:
             raise UnsafeCode(f"unknown name {node.id!r}")

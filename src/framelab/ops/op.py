@@ -7,6 +7,7 @@ from typing import Any, Literal
 
 import pandas as pd
 
+from .policy import ALLOWED_PD_FUNCS, FUNC_TAKING, str_funcs_ok
 from .values import (
     ACCESSORS,
     EXPR_TYPES,
@@ -14,6 +15,8 @@ from .values import (
     OpError,
     Value,
     check_identifier,
+    check_method,
+    check_value,
     decode_scalar,
     encode_scalar,
     node_refs,
@@ -63,6 +66,13 @@ class Op:
             refs += node_refs(self.expr)
         return tuple(dict.fromkeys(refs))
 
+    def _check_string_funcs(self) -> None:
+        """apply/agg/transform look strings up as methods: only pandas kernels may pass."""
+        candidates = [a for a in self.args[:1]] + [v for k, v in self.kwargs if k == "func"]
+        for v in candidates:
+            if not str_funcs_ok(_plain(v), dict_values=self.name != "apply"):
+                raise OpError(f"{self.name}() may only name pandas functions like 'sum' or 'mean'")
+
     def validate(self) -> Op:
         if self.kind not in OP_KINDS:
             raise OpError(f"unknown op kind {self.kind!r}")
@@ -71,13 +81,14 @@ class Op:
                 raise OpError(f"unknown accessor {a!r}")
         for k, _ in self.kwargs:
             check_identifier(k, "keyword")
+        for v in (*self.args, *(x for _, x in self.kwargs), self.expr):
+            if v is not None:
+                check_value(v)
         if self.kind == "func":
             if self.target is not None:
                 raise OpError("a pandas function op has no target")
             check_identifier(self.name, "function name")
-            if not callable(getattr(pd, self.name, None)) or self.name.startswith(
-                ("read_", "to_pickle")
-            ):
+            if self.name not in ALLOWED_PD_FUNCS or not callable(getattr(pd, self.name, None)):
                 raise OpError(f"pd.{self.name} is not an allowed pandas function")
             if not self.parents():
                 raise OpError("a pandas function op must use at least one node")
@@ -85,7 +96,9 @@ class Op:
         if not isinstance(self.target, str) or not self.target:
             raise OpError(f"a {self.kind} op needs a target node")
         if self.kind in ("call", "attr"):
-            check_identifier(self.name, "method or attribute name")
+            check_method(check_identifier(self.name, "method or attribute name"))
+            if self.kind == "call" and self.name in FUNC_TAKING:
+                self._check_string_funcs()
         elif self.kind == "getitem":
             if self.key is None:
                 raise OpError("getitem needs a key (a column label or a list of labels)")
@@ -95,6 +108,12 @@ class Op:
         elif self.kind == "setitem" and (self.key is None or not isinstance(self.expr, EXPR_TYPES)):
             raise OpError("setitem needs a column label and a value expression")
         return self
+
+
+def _plain(v: Value) -> Any:
+    from .values import Lit
+
+    return v.value if isinstance(v, Lit) else None
 
 
 def op_to_json(op: Op) -> dict[str, Any]:

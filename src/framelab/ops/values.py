@@ -35,6 +35,8 @@ __all__ = [
     "This",
     "Value",
     "check_identifier",
+    "check_method",
+    "check_value",
     "decode_scalar",
     "encode_scalar",
     "node_refs",
@@ -51,6 +53,49 @@ class OpError(FramelabError, ValueError):
     """An op or value is malformed or not allowed."""
 
     code = "invalid_op"
+
+
+def check_method(name: str) -> str:
+    from .policy import method_allowed
+
+    if not method_allowed(name):
+        raise OpError(f"{name!r} is not allowed (it could write files or run code)")
+    return name
+
+
+def check_value(v: Any) -> Any:
+    """Enforce the policy on every function reference and inline method call inside ``v``."""
+    from .policy import ALLOWED_STR_FUNCS, np_func_allowed
+
+    if isinstance(v, Func):
+        allowed = np_func_allowed(v.name) if v.ns == "np" else v.name in ALLOWED_STR_FUNCS
+        if v.ns not in ("str", "np") or not allowed:
+            raise OpError(f"function {v.name!r} is not allowed")
+    elif isinstance(v, CallE):
+        check_method(v.name)
+        check_value(v.base)
+        for a in v.args:
+            check_value(a)
+        for _, x in v.kwargs:
+            check_value(x)
+    elif isinstance(v, (GetCol, AttrE)):
+        check_value(v.base)
+    elif isinstance(v, (Cmp, Arith)):
+        check_value(v.left)
+        check_value(v.right)
+    elif isinstance(v, BoolE):
+        for i in v.items:
+            check_value(i)
+    elif isinstance(v, NotE):
+        check_value(v.item)
+    elif isinstance(v, ListV):
+        for i in v.items:
+            check_value(i)
+    elif isinstance(v, DictV):
+        for k, x in v.items:
+            check_value(k)
+            check_value(x)
+    return v
 
 
 def check_identifier(name: str, what: str) -> str:
@@ -331,7 +376,7 @@ def value_from_json(obj: Any) -> Value:
         ns = obj.get("ns", "str")
         if ns not in ("str", "np"):
             raise OpError(f"unknown function namespace {ns!r}")
-        return Func(check_identifier(obj["name"], "function name"), ns)
+        return check_value(Func(check_identifier(obj["name"], "function name"), ns))
     if t == "list":
         return ListV(tuple(value_from_json(i) for i in obj["items"]))
     if t == "dict":
@@ -343,7 +388,7 @@ def value_from_json(obj: Any) -> Value:
     if t == "call":
         return CallE(
             _expr(obj["base"]),
-            check_identifier(obj["name"], "method name"),
+            check_method(check_identifier(obj["name"], "method name")),
             _accessor(obj.get("accessor")),
             tuple(value_from_json(a) for a in obj.get("args", [])),
             tuple(
