@@ -38,7 +38,8 @@ def test_real_browser_boots_the_frontend_and_close_is_detected():
         args.append("--no-sandbox")
     window = launch_app_window(find_chromium(), redirect.as_uri(), extra_args=args)
     try:
-        deadline = time.monotonic() + 30
+        # cold Chrome starts on shared CI runners can take well over 30 s
+        deadline = time.monotonic() + (90 if os.environ.get("CI") else 30)
         while "session.snapshot" not in seen and time.monotonic() < deadline:
             time.sleep(0.05)
         assert "session.hello" in seen and "session.snapshot" in seen
