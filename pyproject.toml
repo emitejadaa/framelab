@@ -83,7 +83,7 @@ markers = ["slow: builds packages, launches browsers or kernels"]
 line-length = 100
 target-version = "py311"
 src = ["src", "tests", "tools"]
-extend-exclude = ["spikes", "*.md"]
+extend-exclude = ["spikes", "docs", "*.md"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM"]

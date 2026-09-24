@@ -1,0 +1,26 @@
+diff --git a/dist/cjs/internal/scrolling-data-grid/infinite-scroller.js b/dist/cjs/internal/scrolling-data-grid/infinite-scroller.js
+index 68ba470515643587d884204109f61e48ec1b252a..1e06b90cd5bccdaa7b08405cedffa63446650be7 100644
+--- a/dist/cjs/internal/scrolling-data-grid/infinite-scroller.js
++++ b/dist/cjs/internal/scrolling-data-grid/infinite-scroller.js
+@@ -138,7 +138,7 @@ export const InfiniteScroller = p => {
+     if (scrollableHeight > 0 && scrollHeight > el.scrollHeight + 5) {
+       // For large jumps (scrollbar interaction) or edge positions,
+       // recalculate position based on percentage
+-      if (Math.abs(delta) > 2000 || newY === 0 || newY === scrollableHeight) {
++      if (Math.abs(delta) > 2000 || newY <= 0 || newY >= scrollableHeight - 1) { // framelab s1 patch: tolerate fractional-DPR rounding
+         const scrollProgress = Math.max(0, Math.min(1, newY / scrollableHeight));
+         const virtualScrollableHeight = scrollHeight - cHeight;
+         virtualY = scrollProgress * virtualScrollableHeight;
+diff --git a/dist/esm/internal/scrolling-data-grid/infinite-scroller.js b/dist/esm/internal/scrolling-data-grid/infinite-scroller.js
+index 68ba470515643587d884204109f61e48ec1b252a..1e06b90cd5bccdaa7b08405cedffa63446650be7 100644
+--- a/dist/esm/internal/scrolling-data-grid/infinite-scroller.js
++++ b/dist/esm/internal/scrolling-data-grid/infinite-scroller.js
+@@ -138,7 +138,7 @@ export const InfiniteScroller = p => {
+     if (scrollableHeight > 0 && scrollHeight > el.scrollHeight + 5) {
+       // For large jumps (scrollbar interaction) or edge positions,
+       // recalculate position based on percentage
+-      if (Math.abs(delta) > 2000 || newY === 0 || newY === scrollableHeight) {
++      if (Math.abs(delta) > 2000 || newY <= 0 || newY >= scrollableHeight - 1) { // framelab s1 patch: tolerate fractional-DPR rounding
+         const scrollProgress = Math.max(0, Math.min(1, newY / scrollableHeight));
+         const virtualScrollableHeight = scrollHeight - cHeight;
+         virtualY = scrollProgress * virtualScrollableHeight;

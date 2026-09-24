@@ -216,8 +216,11 @@ sección por sección, investigada (4 agentes, versiones de sept-2026) y sometid
 ### Procesos, hilos y ventanas
 - Motor en el proceso del usuario con **dos carriles**: cómputo (1 hilo serializado para ops nuevas) y lectura
   (1–2 hilos que sirven ventanas Arrow, stats, value_counts y resúmenes solo desde resultados cacheados
-  inmutables). Renderer matplotlib en su propio hilo. Si el spike S3 muestra latencia p95 > ~250 ms bajo carga
-  GIL, el carril de cómputo pasa a subproceso.
+  inmutables). Renderer matplotlib en su propio hilo. **Resultado S3:** p95 de ventanas ≤ 24 ms bajo carga,
+  pero agregaciones sobre columnas de texto retienen el GIL toda la llamada (13–37 s de bloqueo) → se mantiene
+  el hilo en proceso (un subproceso duplicaría cada raíz, >1 GB para 5M×30); la UI trata todo pedido de datos
+  como asíncrono (esqueletos/spinners); el aviso "la agregación toca columnas no numéricas" pasa a ser una
+  **guarda** previa; se re-mide en M8 y, si hiciera falta, el cómputo pasa a un subproceso dueño de los datos.
 - Cancelación suave (contador de generación); ops encoladas detrás sí se cancelan de verdad.
 - **Política de preview por op** (en el catálogo): `rowwise` (muestra segura: filtros, astype, .str/.dt,
   aritmética, head/tail reales), `sampled_stat` (≈ con tamaño de muestra), `global` (sin preview por muestra:
@@ -226,7 +229,9 @@ sección por sección, investigada (4 agentes, versiones de sept-2026) y sometid
 - Hijos creados sobre un padre aún calculando esperan su resultado completo.
 - Servidor local: 127.0.0.1, puerto aleatorio, token de 32 bytes entregado por archivo redirect 0600 (patrón
   Jupyter), token requerido en `/`, assets y WS, chequeo de `Origin` y `Host`, sin CORS — **criterio de
-  aceptación de M0**.
+  aceptación de M0 (cumplido)**. `/?token=` sirve la página directamente (sin 303: tras una navegación iniciada
+  desde `file://` el salto sería cross-site y perdería la cookie `SameSite=Strict`) y limpia la URL con
+  `history.replaceState`; el archivo redirect se borra apenas el navegador se conecta.
 - Ventana: pywebview (extra `framelab[desktop]`; preferido en Windows/macOS) → Chrome/Chromium/Edge/Brave
   `--app=URL --no-first-run --no-default-browser-check --user-data-dir=<tmp por lanzamiento>` (preferido en
   Linux; `Popen.wait`; limpieza del tmp) → `webbrowser.open` + cierre tras autosave y gracia configurable (~60 s)
@@ -249,7 +254,13 @@ sección por sección, investigada (4 agentes, versiones de sept-2026) y sometid
   parámetros: defaults de `inspect.signature`, tipos de anotaciones resueltas contra `pandas._typing`
   (Literal → enum), fallback a línea de tipo de numpydoc (**numpydoc solo en build**; en runtime el fallback es
   signature + primera línea de docstring), overrides manuales (~60 métodos + `GroupBy.__getitem__`). Lo privado
-  envuelto en adaptadores con tests.
+  envuelto en adaptadores con tests. **Resultado S6:** 89,8 % de 2313 parámetros → control concreto (98,3 % de
+  los nombrados); tipos de control extra `scalar` y `values`; guardar candidatos/nullable/choices por parámetro;
+  la marca `.. deprecated::` se busca solo antes de la primera sección numpydoc (si no, se descartan merge,
+  astype…); ocultar parámetros deprecados (`copy`); nunca pasar `inplace` (pandas 3 devuelve self o None
+  según el método e `interpolate(inplace=True)` muta y luego falla); editores especiales para `assign(**kw)`,
+  agregación con nombre, args de `apply`, `eval/query`, `GroupBy.filter/nth/__getitem__`; funciones `pd.*` en
+  tabla curada (solo 6 de 12 anotan su primer argumento). Prototipo: `docs/superpowers/spikes/artifacts/`.
 - Codegen: **emisor propio** para el subconjunto de nodos generados (Call, Attribute, Subscript, Name, Constant,
   contenedores, Compare, BoolOp, UnaryOp, Lambda), comillas dobles, salida validada con `ast.parse`; literales
   especiales (NaN→`np.nan`, numpy→`.item()`, Timestamp→`pd.Timestamp('ISO')`, tuplas MultiIndex); siempre
@@ -276,8 +287,12 @@ sección por sección, investigada (4 agentes, versiones de sept-2026) y sometid
   Axes{twin_of, props, calls[], artists[]} → Layers[{method, source_node, rows_filter, mapping, split_by, kwargs}].
   Cabecera exportada `fig_x, ax_x = plt.subplots(...)` vs ejecutada `Figure(...)` + `fig.subplots(...)`, cuerpo
   idéntico; solo se emite lo que el usuario fijó.
-- Preview a dpi = base × devicePixelRatio, PNG desde `buffer_rgba()` (compress_level=1); decimación M4/muestreo
-  solo en capas por-punto y solo en preview; estilo "fast" solo en preview.
+- Preview a dpi = base × devicePixelRatio (tope dpr 2), PNG propio (filtro 0 + zlib nivel 1 directo desde
+  `buffer_rgba()`, ~2,5× más rápido que Pillow); reducción solo en preview (**S5**): líneas/step/fill_between →
+  M4 por columna de píxel (salida idéntica); scatter → muestra aleatoria determinística de **20 000** puntos;
+  scatter con `c=` → muestra + cuantización de color (en crudo tarda 28–38 s con 1M); hist/hexbin/boxplot/barras
+  agregadas → datos completos; estilo "fast" solo en preview; `rcParams.copy()` (nunca `dict(rcParams)`, que
+  importa pyplot).
 - Hit-map JSON por frame (bboxes con y invertida, bbox/lims/escalas por eje, polilíneas decimadas; ids por diff
   de `ax.get_children()`); interacción local; traducción al soltar con recetas de DraggableLegend /
   DraggableAnnotation / `set_title(x=,y=)` / `transData.inverted()` + `num2date` (sin tz en ejes naive).
@@ -291,14 +306,25 @@ sección por sección, investigada (4 agentes, versiones de sept-2026) y sometid
   (`onNodeDrag`/`onNodeDragStop` + `getIntersectingNodes` para combinar; hit-test por DOMRect de cajas y barra
   de pestañas; el nodo vuelve a su posición tras soltar). **Módulo DnD por pointer events** solo para fuentes
   externas: sidebar→lienzo, columna del inspector→Series, lista de nodos del Ploter→ejes. @dnd-kit solo para
-  listas ordenables.
+  listas ordenables. **S10:** apagar `autoPanOnNodeDrag` mientras el puntero está fuera del lienzo y restaurar
+  el viewport tras soltar afuera (si no, deriva 23–180 px); fantasma del nodo en el portal fuera del lienzo.
 - Grilla Glide Data Grid 6.0.4-alpha24 (pin exacto) tras un adaptador (fallback AG Grid Community); bloques
   Arrow decodificados con @uwdata/flechette; columnas problemáticas (tipos mixtos, nombres duplicados, listas)
-  con fallback a string + badge; ids posicionales + labels como metadata.
+  con fallback a string + badge; ids posicionales + labels como metadata. **S1:** parche de una línea al
+  `InfiniteScroller` (sin él, a DPR fraccional no se llega a las últimas ~774 filas) vía pnpm
+  `patchedDependencies`; `portalElementRef` al portal de `.fl-root`; tema de Glide con colores ya resueltos (su
+  parser usa un div en `document.body`). **S7:** encoder Arrow v2 (plan por columna cacheado por nodo, nunca
+  `astype(str)` sobre object, formateador acotado), decodificación con `{useBigInt, useDecimalInt}`.
 - UI: shadcn/ui sobre Base UI 1.8 + Tailwind 4.3 con prefijo, reset y tokens scopeados a `.fl-root`; **un
   PortalContainer dentro de `.fl-root`** para menús, popovers, tooltips, paleta (cmdk) y fantasmas de DnD;
   react-resizable-panels 4.13; i18next + react-i18next; Shiki 4 fine-grained; react-colorful; lucide-react;
-  fuentes Inter + JetBrains Mono (OFL, subset latin, licencias en el wheel). Presupuesto < ~800 KB gz.
+  fuentes Inter + JetBrains Mono (OFL, subset latin, licencias en el wheel). Presupuesto < ~800 KB gz; bundle
+  minificado a nivel Rolldown (viaja completo en el `comm_open` de cada widget).
+- **Aislamiento CSS (S2):** dentro de JupyterLab el CSS sin capas del host le gana al reset y a las utilidades
+  en `@layer` → **spike S12 al inicio de M2a**: Shadow DOM (verificar Glide, React Flow, Base UI, cmdk y
+  `@property` de Tailwind dentro de un shadow root) vs. utilidades `important` + reset sin capa. `.fl-root` es
+  enfocable y toma el foco al hacer clic (si no, los atajos del notebook se disparan); los menús propios hacen
+  `preventDefault()` del menú nativo; el tema debe seguir al de JupyterLab/VS Code, no solo al del sistema.
 
 ### Empaquetado y toolchain
 - `pyproject.toml` con hatchling + hook de build (hatch-jupyter-builder ≥0.10 con `npm="pnpm"` o `hatch_build.py`
@@ -321,7 +347,9 @@ sección por sección, investigada (4 agentes, versiones de sept-2026) y sometid
   (protocolo, ops, catálogo, prefs) se generan desde Python y se prueban en pytest.
 - **Presupuesto E2E total (6)**, solo en Linux: abrir ventana desde script · head(5) + copiar código · arrastrar a
   ▦/▟ · scroll de tabla + filtrar por celda crea nodo · arrastrar leyenda cambia el código · 1 smoke Galata en
-  JupyterLab. Windows/macOS en CI: tests Python + prueba headless del lanzador.
+  JupyterLab. Windows/macOS en CI: tests Python + prueba headless del lanzador. Herramienta: `playwright-core`
+  manejando el Chromium del sistema (el MCP de chrome-devtools requiere Google Chrome); en CI Chrome corre con
+  `--no-sandbox` (los runners Ubuntu 24.04 bloquean los user namespaces del sandbox).
 - **Python fuerte** (TDD): fidelidad (script exportado ejecutado en intérprete limpio == resultado del nodo,
   hypothesis sobre etiquetas difíciles, todas las combinaciones de estilos de código, funciones pd, remapeo de
   recetas, reproducir rama), goldens del codegen, catálogo, motor, protocolo (snapshot → rehidratación), ploter.
