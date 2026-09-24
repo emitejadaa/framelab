@@ -1,0 +1,89 @@
+[build-system]
+requires = ["hatchling>=1.32"]
+build-backend = "hatchling.build"
+
+[project]
+name = "framelab"
+dynamic = ["version"]
+description = "Explore, transform and plot pandas DataFrames without writing code — always with the exact Python code."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Emiliano Tejada", email = "emitejadaaragon@gmail.com" }]
+requires-python = ">=3.11"
+keywords = ["pandas", "matplotlib", "dataframe", "gui", "no-code", "jupyter", "eda"]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Intended Audience :: Science/Research",
+  "Intended Audience :: Education",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Framework :: Jupyter",
+  "Topic :: Scientific/Engineering :: Visualization",
+]
+dependencies = [
+  "pandas>=3.0,<4",
+  "matplotlib>=3.11,<4",
+  "numpy>=1.26",
+  "pyarrow>=13",
+  "anywidget>=0.11",
+  "starlette>=0.40",
+  "uvicorn>=0.30",
+  "websockets>=13",
+  "varname[all]>=1.0",
+  "psutil>=5.9",
+  "platformdirs>=4",
+]
+
+[project.optional-dependencies]
+desktop = ["pywebview>=6.2"]
+io = ["openpyxl", "tabulate", "jinja2", "lxml"]
+
+[project.urls]
+Repository = "https://github.com/emitejadaa/framelab"
+
+[dependency-groups]
+dev = [
+  "pytest>=8",
+  "pytest-timeout",
+  "hypothesis",
+  "ruff",
+  "httpx",
+  "numpydoc",
+  "nbformat",
+  "nbclient",
+  "ipykernel",
+  "jupyterlab",
+  "build",
+]
+
+[tool.hatch.version]
+path = "src/framelab/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/framelab"]
+artifacts = ["src/framelab/_static/*"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/framelab", "frontend", "tools", "tests", "hatch_build.py", "README.md", "LICENSE", "mise.toml"]
+exclude = ["frontend/node_modules", "frontend/dist", "frontend/tests/scaffold"]
+artifacts = ["src/framelab/_static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+timeout = 120
+markers = ["slow: builds packages, launches browsers or kernels"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests", "tools"]
+extend-exclude = ["spikes", "*.md"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
