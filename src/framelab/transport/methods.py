@@ -25,6 +25,13 @@ def _int(params: dict[str, Any], key: str, default: int | None, *, minimum: int 
     return value
 
 
+def _required_int(params: dict[str, Any], key: str) -> int:
+    value = _int(params, key, None)
+    if value is None:
+        raise BadRequest(f"{key} is required")
+    return value
+
+
 def _id(params: dict[str, Any]) -> str:
     value = params.get("id")
     if not isinstance(value, str) or not value:
@@ -62,6 +69,14 @@ def register_session_methods(dispatcher: Dispatcher) -> None:
     def summary(params: dict[str, Any], _buffers: list[bytes]) -> dict[str, Any]:
         return session.summary(_id(params))
 
+    def _sort(params: dict[str, Any]) -> tuple[int, bool] | None:
+        sort = params.get("sort")
+        if sort is None:
+            return None
+        if not isinstance(sort, dict) or not isinstance(sort.get("ascending"), bool):
+            raise BadRequest("sort must be {column, ascending}")
+        return _required_int(sort, "column"), sort["ascending"]
+
     def window(params: dict[str, Any], _buffers: list[bytes]) -> Reply:
         data, meta = session.window(
             _id(params),
@@ -69,8 +84,19 @@ def register_session_methods(dispatcher: Dispatcher) -> None:
             limit=min(_int(params, "limit", 200), 5000),
             col_start=_int(params, "col_start", 0),
             col_stop=_int(params, "col_stop", None),
+            sort=_sort(params),
         )
         return Reply(meta, [data])
+
+    def filter_cell(params: dict[str, Any], _buffers: list[bytes]) -> dict[str, Any]:
+        node = session.filter_cell(
+            _id(params),
+            row=_required_int(params, "row"),
+            column=_required_int(params, "column"),
+            mode=params.get("mode", "eq"),
+            sort=_sort(params),
+        )
+        return {"node": node.info()}
 
     def code(params: dict[str, Any], _buffers: list[bytes]) -> dict[str, Any]:
         mode = params.get("mode", "origin")
@@ -216,4 +242,5 @@ def register_session_methods(dispatcher: Dispatcher) -> None:
     dispatcher.register("op.preview", preview)
     dispatcher.register("node.summary", summary)
     dispatcher.register("node.window", window)
+    dispatcher.register("table.filter_cell", filter_cell)
     dispatcher.register("node.code", code)

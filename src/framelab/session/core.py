@@ -426,7 +426,7 @@ class Session:
                 if self._by_name.get(node.name) == i:
                     del self._by_name[node.name]
                 self._results.pop(i, None)
-                self._encoders.pop(i, None)
+                self._drop_encoders(i)
                 self._cache.discard(i)
                 future = self._futures.pop(i, None)
                 if future is not None:
@@ -634,7 +634,7 @@ class Session:
                 if node is None or node.state is not NodeState.READY or node.is_root:
                     continue
                 self._results.pop(nid, None)
-                self._encoders.pop(nid, None)
+                self._drop_encoders(nid)
                 self._futures.pop(nid, None)  # a finished future would keep the value alive
                 self._cache.discard(nid)
                 node.state = NodeState.FREED
@@ -786,20 +786,85 @@ class Session:
         col_start: int = 0,
         col_stop: int | None = None,
         timeout: float = 30.0,
+        sort: tuple[int, bool] | None = None,
     ) -> tuple[bytes, dict]:
-        """Arrow IPC bytes + metadata for a block of rows (and optionally of columns)."""
-        from ..table import NotTabular, WindowEncoder, to_frame
+        """Arrow IPC bytes + metadata for a block of rows (and optionally of columns).
+
+        ``sort=(column position, ascending)`` orders the rows for viewing only: no node is created
+        (the table's "convert to step" does that).
+        """
+        from ..table import WindowEncoder
 
         nid = self._resolve(key)
-        value = self.wait(nid, timeout)
+        frame = self._frame(nid, timeout)
+        cache_key = nid if sort is None else f"{nid}|{sort[0]}|{int(sort[1])}"
         with self._lock:
-            encoder = self._encoders.get(nid)
-            if encoder is None:
-                frame = to_frame(value)
-                if frame is None:
-                    raise NotTabular(f"{self._nodes[nid].name} is not a table")
-                encoder = self._encoders[nid] = WindowEncoder(frame)
-        return encoder.encode(offset, limit, col_start, col_stop)
+            encoder = self._encoders.get(cache_key)
+        if encoder is None:
+            view = frame if sort is None else self._sorted(frame, sort)
+            encoder = WindowEncoder(view)
+            with self._lock:
+                if nid in self._nodes:
+                    self._encoders[cache_key] = encoder
+        data, meta = encoder.encode(offset, limit, col_start, col_stop)
+        meta["sort"] = None if sort is None else {"column": sort[0], "ascending": sort[1]}
+        return data, meta
+
+    def _frame(self, nid: str, timeout: float) -> pd.DataFrame:
+        from ..table import NotTabular, to_frame
+
+        frame = to_frame(self.wait(nid, timeout))
+        if frame is None:
+            raise NotTabular(f"{self._nodes[nid].name} is not a table")
+        return frame
+
+    @staticmethod
+    def _sorted(frame: pd.DataFrame, sort: tuple[int, bool]) -> pd.DataFrame:
+        column, ascending = sort
+        if not 0 <= column < frame.shape[1]:
+            raise BadRequest(f"there is no column at position {column}")
+        values = frame.iloc[:, column].reset_index(drop=True)
+        try:
+            order = values.sort_values(ascending=ascending, kind="stable", na_position="last").index
+        except TypeError as exc:
+            raise BadRequest(f"this column cannot be sorted: {exc}") from None
+        return frame.iloc[order]
+
+    def _drop_encoders(self, nid: str) -> None:
+        for cache_key in [k for k in self._encoders if k == nid or k.startswith(f"{nid}|")]:
+            del self._encoders[cache_key]
+
+    def filter_cell(
+        self,
+        key: str,
+        row: int,
+        column: int,
+        mode: str = "eq",
+        sort: tuple[int, bool] | None = None,
+    ) -> Node:
+        """A filter node keeping the rows whose ``column`` equals (``eq``) or differs from
+        (``ne``) the value in that cell; missing values filter with isna()/notna()."""
+        from ..ops.values import CallE, Cmp, GetCol, Lit, This
+
+        if mode not in ("eq", "ne"):
+            raise BadRequest("mode must be eq or ne")
+        nid = self._resolve(key)
+        value = self.wait(nid)
+        frame = self._frame(nid, 30.0)
+        view = frame if sort is None else self._sorted(frame, sort)
+        if not (0 <= row < len(view) and 0 <= column < view.shape[1]):
+            raise BadRequest("that cell is outside the table")
+        cell = view.iloc[row, column]
+        base = This() if isinstance(value, pd.Series) else GetCol(This(), view.columns[column])
+        if not pd.api.types.is_scalar(cell):
+            raise BadRequest("only cells with a single value can filter")
+        if pd.isna(cell):
+            expr: Any = CallE(base, "isna" if mode == "eq" else "notna")
+        else:
+            if isinstance(cell, np.generic):
+                cell = cell.item()
+            expr = Cmp(base, "==" if mode == "eq" else "!=", Lit(cell))
+        return self.apply(Op("filter", nid, expr=expr))
 
     def members(self, key: str, timeout: float = 30.0) -> list[dict[str, Any]]:
         """Every pandas member this node offers (from the catalog), allowed and non-mutating."""
