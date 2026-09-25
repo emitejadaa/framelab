@@ -8,6 +8,7 @@ import {
   type NodeChange,
   ReactFlow,
   ReactFlowProvider,
+  useReactFlow,
 } from "@xyflow/react";
 import { type MouseEvent as ReactMouseEvent, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -56,6 +57,8 @@ function CanvasInner() {
   const [over, setOver] = useState<Box | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [nodes, setNodes] = useState<AnyNode[]>([]);
+  const container = useRef<HTMLDivElement>(null);
+  const flow = useReactFlow();
   const infos = snapshot?.nodes ?? [];
   const figures = snapshot?.figures ?? [];
 
@@ -85,6 +88,32 @@ function CanvasInner() {
     }
     setNodes(cards);
   }, [infos, figures, selectedId]);
+
+  // Keep the selected node in sight: new nodes appear far right as the graph grows, and the
+  // minimap covers the bottom-right corner.
+  useEffect(() => {
+    if (!selectedId) return;
+    const node = nodes.find((n) => n.id === selectedId);
+    const box = container.current?.getBoundingClientRect();
+    if (!node || !box) return;
+    const { x, y, zoom } = flow.getViewport();
+    const left = node.position.x * zoom + x;
+    const top = node.position.y * zoom + y;
+    const right = left + NODE_W * zoom;
+    const bottom = top + NODE_H * zoom;
+    const margin = 24;
+    const underMinimap = right > box.width - 230 && bottom > box.height - 180;
+    const outside = left < margin || top < 60 || right > box.width - margin || bottom > box.height - margin;
+    if (outside || underMinimap) {
+      const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+      void flow.setCenter(node.position.x + NODE_W / 2, node.position.y + NODE_H / 2, {
+        zoom,
+        duration: reduce ? 0 : 200,
+      });
+    }
+    // only when the selection changes or its node first gets a position
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, nodes.some((n) => n.id === selectedId)]);
 
   const edges: Edge[] = useMemo(
     () => [
@@ -147,7 +176,7 @@ function CanvasInner() {
   };
 
   return (
-    <div className="fl-canvas">
+    <div className="fl-canvas" ref={container}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -241,7 +270,7 @@ function CanvasInner() {
           {problem} ×
         </button>
       ) : null}
-      <div className="fl-canvas-hint">{t("workbench.hint")}</div>
+      {infos.length <= 3 ? <div className="fl-canvas-hint">{t("workbench.hint")}</div> : null}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import dagre from "@dagrejs/dagre";
 import type { NodeInfo } from "../generated/protocol";
 
-export const NODE_W = 210;
+export const NODE_W = 236;
 export const NODE_H = 58;
 
 /** Left-to-right layered layout of the whole graph. */

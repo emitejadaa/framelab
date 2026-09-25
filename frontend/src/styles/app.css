@@ -15,7 +15,7 @@
 .fl-root .fl-dropzone { padding: 10px 14px; border: 1.5px dashed var(--fl-border); border-radius: 8px; background: var(--fl-panel); color: var(--fl-muted); font-size: 12px; transition: border-color var(--fl-duration), color var(--fl-duration); }
 .fl-root .fl-dropzone[data-over="true"] { border-color: var(--fl-accent); color: var(--fl-accent); }
 .fl-root .fl-dropzone[data-disabled="true"] { opacity: .5; }
-.fl-root .fl-card { display: flex; align-items: center; gap: 10px; width: 210px; height: 58px; padding: 0 12px; border: 1px solid var(--fl-border); border-radius: 8px; background: var(--fl-panel); box-shadow: 0 1px 2px rgb(0 0 0 / .06); transition: border-color var(--fl-duration); }
+.fl-root .fl-card { display: flex; align-items: center; gap: 10px; width: 236px; height: 58px; padding: 0 12px; border: 1px solid var(--fl-border); border-radius: 8px; background: var(--fl-panel); box-shadow: 0 1px 2px rgb(0 0 0 / .06); transition: border-color var(--fl-duration); }
 .fl-root .fl-card[data-selected="true"] { border-color: var(--fl-accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--fl-accent) 25%, transparent); }
 .fl-root .fl-card[data-state="error"] { border-color: var(--fl-danger); }
 .fl-root .fl-card[data-state="blocked"] { opacity: .55; border-style: dashed; }
@@ -99,7 +99,7 @@
 .fl-root .fl-banner { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); padding: 6px 12px; border-radius: 6px; background: var(--fl-fg); color: var(--fl-bg); font-size: 12px; }
 @keyframes fl-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 /* ---- workbench additions ---- */
-.fl-root .fl-figure-card { width: 190px; border-style: dashed; }
+.fl-root .fl-figure-card { width: 210px; border-style: dashed; }
 .fl-root .fl-card-icon[data-kind="Figure"] { color: var(--fl-accent); }
 .fl-root .fl-edge-figure .react-flow__edge-path { stroke-dasharray: 4 4; }
 .fl-root .fl-canvas-error { position: absolute; top: 56px; right: 10px; max-width: 360px; padding: 6px 10px; border-radius: 6px; background: var(--fl-panel); border: 1px solid var(--fl-danger); color: var(--fl-danger); font-size: 12px; text-align: left; }
