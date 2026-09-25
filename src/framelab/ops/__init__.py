@@ -1,6 +1,6 @@
 """Structured, JSON round-trippable descriptions of pandas operations."""
 
-from .op import OP_KINDS, SCHEMA_VERSION, Op, OpKind, op_from_json, op_to_json
+from .op import OP_KINDS, SCHEMA_VERSION, Op, OpKind, op_from_json, op_to_json, remap_op
 from .values import (
     Arith,
     AttrE,
@@ -53,6 +53,7 @@ __all__ = [
     "node_refs",
     "op_from_json",
     "op_to_json",
+    "remap_op",
     "value_from_json",
     "value_to_json",
 ]

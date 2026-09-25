@@ -19,7 +19,7 @@ from ..codegen.style import CodeStyle, restyle
 from ..engine import ComputeLane, run_statement
 from ..errors import FramelabError
 from ..naming import RootSpec, auto_node_name, op_alias, sanitize_identifier, unique_name
-from ..ops import Op
+from ..ops import Op, remap_op
 from ..options import OptionsRegistry
 from ..options import registry as default_registry
 from ..protocol.schema import SessionSnapshot
@@ -27,7 +27,7 @@ from .figures import FigureStore
 from .history import Change, History, NodeRecord
 from .node import ErrorDetail, Node, NodeError, NodeState, NotReady, UnknownNode, classify
 
-__all__ = ["CannotDelete", "CannotRename", "NameTaken", "Session"]
+__all__ = ["CannotDelete", "CannotEdit", "CannotRename", "NameTaken", "Session"]
 
 log = logging.getLogger("framelab")
 
@@ -45,6 +45,10 @@ class CannotRename(FramelabError, ValueError):
 
 class NameTaken(FramelabError, ValueError):
     code = "name_taken"
+
+
+class CannotEdit(FramelabError, ValueError):
+    code = "cannot_edit"
 
 
 class Session:
@@ -272,6 +276,26 @@ class Session:
     def _after_rename(self, changes: list[tuple[str, str, bool, str, bool]]) -> None:
         if changes:
             self._record(Change("rename", names=changes))
+
+    def edit_as_new(
+        self, key: str, op: Op, *, replay: bool = True, name: str | None = None
+    ) -> dict[str, str]:
+        """A sibling of ``key`` built from ``op``; with ``replay`` its descendants are rebuilt on
+        the sibling. The original branch stays as it was. Returns old id -> new id."""
+        original = self.node(key)
+        if original.is_root:
+            raise CannotEdit(f"{original.name} is data passed to fl.explore()")
+        mapping: dict[str, str] = {}
+        with self.batch():
+            mapping[original.id] = self.apply(op, name=name).id
+            if replay:
+                for d in self.descendants(original.id)[1:]:
+                    child = self.node(d)
+                    taken = set(self.names) | self.plots.names()
+                    wanted = None if child.name_auto else unique_name(child.name, taken)
+                    new_op = remap_op(child.op, mapping)  # type: ignore[arg-type]
+                    mapping[d] = self.apply(new_op, name=wanted, force=child.force).id
+        return mapping
 
     def descendants(self, key: str) -> list[str]:
         """The node and everything computed from it, in creation order."""

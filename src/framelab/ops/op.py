@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -153,3 +154,21 @@ def op_from_json(data: Any) -> Op:
         expr=expr,  # type: ignore[arg-type]
     )
     return op.validate()
+
+
+def remap_op(op: Op, mapping: Mapping[str, str]) -> Op:
+    """The same op reading other nodes: every node id found in ``mapping`` is replaced."""
+
+    def fix(obj: Any) -> Any:
+        if isinstance(obj, dict):
+            if obj.get("t") == "node" and obj.get("id") in mapping:
+                return {**obj, "id": mapping[obj["id"]]}
+            return {k: fix(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [fix(v) for v in obj]
+        return obj
+
+    data = fix(op_to_json(op))
+    if data.get("target") in mapping:
+        data["target"] = mapping[data["target"]]
+    return op_from_json(data)

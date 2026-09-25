@@ -162,7 +162,17 @@ def register_session_methods(dispatcher: Dispatcher) -> None:
             raise BadRequest("name must be a non-empty string")
         return {"renamed": session.rename(_id(params), name)}
 
+    def edit_as_new(params: dict[str, Any], _buffers: list[bytes]) -> dict[str, Any]:
+        mapping = session.edit_as_new(
+            _id(params),
+            op_from_json(params.get("op")),
+            replay=params.get("replay", True) is not False,
+            name=params.get("name"),
+        )
+        return {"mapping": mapping}
+
     dispatcher.register("node.rename", rename)
+    dispatcher.register("node.edit_as_new", edit_as_new)
     dispatcher.register(
         "node.cancel", lambda params, _b: {"cancelled": session.cancel(_id(params))}
     )
