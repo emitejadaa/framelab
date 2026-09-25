@@ -18,6 +18,7 @@ import psutil
 from ..codegen.render import op_label, render_op
 from ..codegen.style import CodeStyle, restyle
 from ..engine import ComputeLane, guards, run_statement
+from ..engine.cache import ResultCache, buffers, default_budget, value_bytes
 from ..errors import FramelabError
 from ..naming import RootSpec, auto_node_name, op_alias, sanitize_identifier, unique_name
 from ..ops import Op, remap_op
@@ -65,7 +66,6 @@ class Session:
     ) -> None:
         self.id = secrets.token_hex(8)
         self._guard_bytes = guard_bytes
-        self._cache_bytes = cache_bytes
         self.rev = 0
         self._options = options if options is not None else default_registry
         self._lock = threading.RLock()
@@ -82,6 +82,11 @@ class Session:
         self._history = History()
         self._replaying = 0
         self._batch: Change | None = None
+        budget = cache_bytes
+        if budget is None:
+            budget = default_budget(self._options.get("performance.cache_fraction"))
+        self._cache = ResultCache(budget)
+        self._root_buffers: set[int] = set()
         for spec in roots:
             if not isinstance(spec.obj, (pd.DataFrame, pd.Series)):
                 raise TypeError(
@@ -104,6 +109,7 @@ class Session:
             )
             self._register(node)
             self._results[node.id] = frozen
+            self._root_buffers.update(address for address, _ in buffers(frozen))
             done: Future = Future()
             done.set_result(frozen)
             self._futures[node.id] = done
@@ -373,6 +379,7 @@ class Session:
                     del self._by_name[node.name]
                 self._results.pop(i, None)
                 self._encoders.pop(i, None)
+                self._cache.discard(i)
                 future = self._futures.pop(i, None)
                 if future is not None:
                     future.cancel()
@@ -517,15 +524,17 @@ class Session:
                 blocked_info = None
                 node.state = NodeState.COMPUTING
                 self.rev += 1
-                parent_values = {p: self._results[p] for p in node.parents}
-                env = {self._nodes[p].name: v for p, v in parent_values.items()}
-                rendered = render_op(node.op, node.name, self.variable_names())  # type: ignore[arg-type]
+                names = self.variable_names()
+                rendered = render_op(node.op, node.name, names)  # type: ignore[arg-type]
                 info = node.info()
         if blocked_info is not None:
             self._emit("node.state", blocked_info)
             raise NodeError(node)
         self._emit("node.state", info)
         try:
+            # freed parents are recomputed here, on the compute lane
+            parent_values = {p: self._value(p) for p in node.parents}
+            env = {names[p]: v for p, v in parent_values.items()}
             if not node.force:
                 guards.check(node.op, parent_values, limit_bytes=self._guard_limit())  # type: ignore[arg-type]
             value, warns = run_statement(rendered.executed, node.name, env)
@@ -552,20 +561,88 @@ class Session:
             self._emit("node.state", info)
             raise NodeError(node)
         with self._lock:
-            self._results[nid] = value
+            victims = self._store(nid, value)
             node.kind, node.shape = classify(value)
             node.warnings = tuple(warns)
             node.state = NodeState.READY
             self.rev += 1
             info = node.info()
         self._emit("node.state", info)
+        self._evict(victims)
         return value
+
+    # ---- memory ----------------------------------------------------------------------------
+    def _store(self, nid: str, value: Any) -> list[str]:
+        """Keep a result (lock held); returns the nodes to free to stay within budget."""
+        self._results[nid] = value
+        self._cache.add(nid, value_bytes(value, self._root_buffers))
+        return self._cache.victims()
+
+    def _evict(self, ids: list[str]) -> None:
+        infos = []
+        with self._lock:
+            for nid in ids:
+                node = self._nodes.get(nid)
+                if node is None or node.state is not NodeState.READY or node.is_root:
+                    continue
+                self._results.pop(nid, None)
+                self._encoders.pop(nid, None)
+                self._futures.pop(nid, None)  # a finished future would keep the value alive
+                self._cache.discard(nid)
+                node.state = NodeState.FREED
+                infos.append(node.info())
+            if infos:
+                self.rev += 1
+        for info in infos:
+            self._emit("node.state", info)
+
+    def _value(self, nid: str) -> Any:
+        """A node's value on the compute lane, recomputing freed ancestors first."""
+        with self._lock:
+            if nid in self._results:
+                self._cache.touch(nid)
+                return self._results[nid]
+            node = self._nodes[nid]
+            parents = node.parents
+        values = {p: self._value(p) for p in parents}
+        with self._lock:
+            names = self.variable_names()
+            rendered = render_op(node.op, node.name, names)  # type: ignore[arg-type]
+        env = {names[p]: v for p, v in values.items()}
+        value, _ = run_statement(rendered.executed, node.name, env)
+        with self._lock:
+            victims = self._store(nid, value)
+            node.state = NodeState.READY
+            self.rev += 1
+            info = node.info()
+        self._emit("node.state", info)
+        self._evict([v for v in victims if v != nid])
+        return value
+
+    def set_pins(self, ids: list[str]) -> list[str]:
+        """Nodes the UI shows (open tabs, figure sources): never freed while pinned."""
+        with self._lock:
+            self._cache.pinned = {i for i in ids if i in self._nodes}
+            victims = self._cache.victims()
+            pinned = sorted(self._cache.pinned)
+        self._evict(victims)
+        return pinned
 
     def wait(self, key: str, timeout: float | None = None) -> Any:
         """The node's value, waiting for its computation (raises NodeError on failure)."""
+        info = None
         with self._lock:
             nid = self._resolve(key)
+            node = self._nodes[nid]
+            if node.state is NodeState.FREED:  # released from memory: compute it again
+                node.state = NodeState.PENDING
+                self._futures[nid] = self._lane.submit(self._value, nid)
+                self.rev += 1
+                info = node.info()
             future = self._futures[nid]
+            self._cache.touch(nid)
+        if info is not None:
+            self._emit("node.state", info)
         try:
             return future.result(timeout)
         except FutureTimeout:

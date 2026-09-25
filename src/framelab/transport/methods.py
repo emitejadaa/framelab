@@ -175,6 +175,13 @@ def register_session_methods(dispatcher: Dispatcher) -> None:
         )
         return {"mapping": mapping}
 
+    def pins(params: dict[str, Any], _buffers: list[bytes]) -> dict[str, Any]:
+        ids = params.get("ids", [])
+        if not isinstance(ids, list) or not all(isinstance(i, str) for i in ids):
+            raise BadRequest("ids must be a list of node ids")
+        return {"pinned": session.set_pins(ids)}
+
+    dispatcher.register("session.pins", pins)
     dispatcher.register("node.rename", rename)
     dispatcher.register("node.edit_as_new", edit_as_new)
     dispatcher.register(

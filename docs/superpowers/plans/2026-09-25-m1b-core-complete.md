@@ -2319,7 +2319,8 @@ def wait_for(predicate, timeout=5.0):
 def test_views_of_the_roots_cost_nothing():
     roots = {address for address, _ in buffers(FRAME)}
     assert value_bytes(FRAME["a"], roots) == 0
-    assert value_bytes(FRAME.head(10), roots) == 0
+    assert value_bytes(FRAME.iloc[:10], roots) == 0
+    assert 0 < value_bytes(FRAME.head(10), roots) <= 80  # pandas 3 head() copies numeric columns
     assert value_bytes(FRAME["a"] * 2, roots) >= 8000
 
 
