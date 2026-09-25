@@ -14,6 +14,7 @@ from typing import Any
 import pandas as pd
 
 from ..codegen.render import op_label, render_op
+from ..codegen.style import CodeStyle, restyle
 from ..engine import ComputeLane, run_statement
 from ..errors import FramelabError
 from ..naming import RootSpec, auto_node_name, sanitize_identifier
@@ -179,9 +180,10 @@ class Session:
                     raise UnknownNode(f"no node with id {parent!r}")
             names = self.variable_names()
             final = sanitize_identifier(name) if name else auto_node_name(op, names, self._by_name)
+        style = self.code_style()
         return {
             "name": final,
-            "code": render_op(op, final, names).display,
+            "code": restyle(render_op(op, final, names, style).display, style),
             "label": op_label(op, names),
         }
 
@@ -291,10 +293,14 @@ class Session:
                     stack.extend(self._nodes[nid].parents)
             return [nid for nid in self._nodes if nid in wanted]
 
-    def code(self, key: str, mode: str = "origin") -> str:
+    def code_style(self) -> CodeStyle:
+        """The code style from ``fl.options``, never shadowing a node's variable."""
+        return CodeStyle.from_options(self._options).safe_for(set(self.names))
+
+    def code(self, key: str, mode: str = "origin", style: CodeStyle | None = None) -> str:
         from ..codegen.script import node_script
 
-        return node_script(self, key, mode=mode)
+        return node_script(self, key, mode=mode, style=style)
 
     def window(
         self,

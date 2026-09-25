@@ -18,9 +18,6 @@ from framelab.session import Session
 PNG = b"\x89PNG\r\n\x1a\n"
 
 
-# ruff: noqa: E501 - the gallery below reads best one layer per line
-
-
 def col(name):
     return {"col": name}
 

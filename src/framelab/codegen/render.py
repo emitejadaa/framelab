@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import keyword
 from collections.abc import Mapping
 from dataclasses import dataclass
 
@@ -27,8 +28,10 @@ from ..ops.values import (
     Value,
 )
 from .literals import emit_literal
+from .query import to_query
+from .style import DEFAULT_STYLE, CodeStyle
 
-__all__ = ["Rendered", "op_label", "render_expr", "render_op", "render_value"]
+__all__ = ["Rendered", "keyword_arg", "op_label", "render_expr", "render_op", "render_value"]
 
 MAX_LABEL = 48
 # ~x binds tighter than comparisons, arithmetic, & and |, so NotE never needs parentheses.
@@ -162,18 +165,34 @@ def _expression(op: Op, names: Mapping[str, str]) -> str:
     raise OpError(f"{op.kind} is not an expression op")
 
 
-def render_op(op: Op, result: str, names: Mapping[str, str]) -> Rendered:
+def keyword_arg(key: str, value: str) -> str:
+    """``key=value`` when ``key`` is a valid keyword, else ``**{"key": value}``."""
+    if key.isidentifier() and not keyword.iskeyword(key):
+        return f"{key}={value}"
+    return f"**{{{emit_literal(key)}: {value}}}"
+
+
+def render_op(
+    op: Op, result: str, names: Mapping[str, str], style: CodeStyle = DEFAULT_STYLE
+) -> Rendered:
     """Statement(s) that bind ``result``; the executed form is a verified equivalent."""
     if op.kind == "setitem":
         base = names[op.target]  # type: ignore[index]
         value = render_expr(op.expr, names, result)  # type: ignore[arg-type]
         assign = f"{result}[{emit_literal(op.key)}] = {value}"
         # Copy-on-Write: copy(deep=False) is equal and O(1); the user sees the idiom.
-        return Rendered(
-            display=f"{result} = {base}.copy()\n{assign}",
-            executed=f"{result} = {base}.copy(deep=False)\n{assign}",
-        )
+        executed = f"{result} = {base}.copy(deep=False)\n{assign}"
+        if style.column_assign == "assign" and isinstance(op.key, str):
+            arg = keyword_arg(op.key, render_expr(op.expr, names, base))  # type: ignore[arg-type]
+            return Rendered(f"{result} = {base}.assign({arg})", executed)
+        return Rendered(f"{result} = {base}.copy()\n{assign}", executed)
     code = f"{result} = {_expression(op, names)}"
+    if op.kind == "filter" and style.filter_style == "query":
+        query = to_query(op.expr)
+        if query is not None:
+            base = names[op.target]  # type: ignore[index]
+            return Rendered(f"{result} = {base}.query({emit_literal(query)})", code)
+        return Rendered(f"# query() cannot express this condition: boolean mask\n{code}", code)
     return Rendered(code, code)
 
 

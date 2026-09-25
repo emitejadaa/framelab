@@ -91,5 +91,8 @@ extend-exclude = ["spikes", "docs", "*.md"]
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM"]
 
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]  # expected code and long literal strings read best on one line
+
 [tool.hatch.build.hooks.custom]
 path = "hatch_build.py"

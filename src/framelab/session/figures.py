@@ -10,7 +10,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from ..codegen.literals import emit_literal
-from ..codegen.script import pipeline_lines, used_imports
+from ..codegen.script import pipeline_lines, used_modules
+from ..codegen.style import import_lines, restyle
 from ..errors import BadRequest
 from ..naming import unique_name
 from ..plot.codegen import FigureCode, generate
@@ -251,22 +252,27 @@ class FigureStore:
             if exported.get("transparent"):
                 args.append("transparent=True")
             savefig = f"{code.fig_var}.savefig({', '.join(args)})"
+        style = self._session.code_style()
         figure = code.display(savefig=savefig)
         if mode == "figure":
-            return figure
+            return restyle(figure, style)
         sources = []
         for sid in doc.sources():
             if sid in self._session:
                 sources += [n for n in self._session.lineage(sid) if n not in sources]
         order = [nid for nid in self._session.node_ids() if nid in set(sources)]
-        pipeline = "\n".join(pipeline_lines(self._session, order))
-        modules = used_imports(pipeline + "\n" + figure)
-        pandas = "import pandas as pd"
-        imports = ["import matplotlib.pyplot as plt", *(m for m in modules if m != pandas), pandas]
-        parts = ["\n".join(imports)]
+        if style.chained:
+            from ..codegen.chain import chained_lines
+
+            present = [sid for sid in doc.sources() if sid in self._session]
+            pipeline = "\n".join(chained_lines(self._session, present, style))
+        else:
+            pipeline = "\n".join(pipeline_lines(self._session, order, style=style))
+        used = used_modules(pipeline + "\n" + figure) | {"plt", "pd"}
+        parts = ["\n".join(import_lines(used, style))] if style.include_imports else []
         if pipeline.strip():
-            parts.append(pipeline)
-        parts.append(figure + "\nplt.show()")
+            parts.append(restyle(pipeline, style))
+        parts.append(restyle(figure, style) + f"\n{style.pyplot_alias}.show()")
         return "\n\n".join(parts) + "\n"
 
     def _build(self, doc: FigureDoc, timeout: float, preview_limit: int | None):
