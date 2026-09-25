@@ -79,3 +79,30 @@ def test_bad_window_params_are_bad_requests(d, params):
     env, _ = d.handle(req("node.window", params), [])
     assert env["error"]["code"] in ("bad_request", "unknown_node")
     assert env["error"]["code"] != "internal"
+
+
+def test_op_preview_renders_without_creating_a_node(d):
+    op = op_to_json(call("n1", "head", n=5))
+    res, _ = result(d, "op.preview", {"op": op})
+    assert res == {
+        "name": "ventas_head",
+        "code": "ventas_head = ventas.head(n=5)",
+        "label": "head(n=5)",
+    }
+    assert [n.name for n in d.session.nodes()] == ["ventas"]
+
+
+def test_op_preview_reports_invalid_ops(d):
+    env, _ = d.handle(
+        req(
+            "op.preview",
+            {"op": {"schema_v": 1, "kind": "call", "target": "n1", "name": "to_pickle"}},
+        ),
+        [],
+    )
+    assert env["error"]["code"] == "invalid_op"
+
+
+def test_summary_columns_carry_encoded_labels(d):
+    res, _ = result(d, "node.summary", {"id": "n1"})
+    assert [c["label"] for c in res["columns"]] == ["a", "b"]

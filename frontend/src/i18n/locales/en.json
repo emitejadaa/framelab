@@ -1,13 +1,157 @@
 {
   "app": {
     "connecting": "Connecting…",
+    "reconnecting": "Reconnecting…",
+    "loading": "Loading…",
     "protocolMismatch": "This framelab window does not match the installed Python package. Close it and run explore() again.",
     "error": "Something went wrong"
   },
   "workbench": {
     "roots": "Data",
     "shape": "{{rows}} × {{cols}}",
-    "rows": "{{count}} rows"
+    "rows": "{{count}} rows",
+    "drop_table": "Table",
+    "drop_plot": "Plot",
+    "plot_soon": "Plots arrive in a later version",
+    "hint": "Right-click a node for operations · double-click to open its table · drag it onto ▦ Table"
+  },
+  "tabs": {
+    "workbench": "Workbench",
+    "close": "Close"
+  },
+  "node": {
+    "state": {
+      "pending": "pending",
+      "computing": "computing…",
+      "error": "error",
+      "blocked": "blocked (parent failed)",
+      "ready": "ready"
+    }
+  },
+  "menu": {
+    "search": "Search operation…",
+    "node": "Node",
+    "open_table": "Open table",
+    "copy_code": "Copy code"
+  },
+  "inspector": {
+    "empty": "Select a node",
+    "operations": "Operations…",
+    "memory": "Memory",
+    "preview": "First rows",
+    "columns": "Columns ({{count}})",
+    "nulls": "{{count}} nulls",
+    "groups": "Groups",
+    "keys": "Keys"
+  },
+  "code": {
+    "title": "Code",
+    "origin": "From the start",
+    "step": "This step",
+    "copy": "Copy",
+    "copied": "Copied ✓"
+  },
+  "table": {
+    "range": "{{from}}–{{to}} of {{total}}",
+    "empty": "No rows",
+    "as_text": "text"
+  },
+  "form": {
+    "apply": "Apply",
+    "cancel": "Cancel",
+    "code": "Code",
+    "optional": "optional",
+    "yes": "Yes",
+    "missing": "Fill in “{{field}}”",
+    "bad_number": "Type a number",
+    "bad_bool": "Type true or false",
+    "bad_date": "Type a date like 2024-01-31"
+  },
+  "ops": {
+    "category": {
+      "view": "View",
+      "select": "Select & filter",
+      "sort": "Sort",
+      "clean": "Clean",
+      "transform": "Transform",
+      "group": "Group",
+      "aggregate": "Summarise",
+      "text": "Text",
+      "dates": "Dates"
+    },
+    "head": "First rows (head)",
+    "tail": "Last rows (tail)",
+    "sample": "Random sample",
+    "describe": "Statistics (describe)",
+    "transpose": "Transpose (T)",
+    "select_columns": "Keep columns",
+    "column": "One column",
+    "filter": "Filter rows",
+    "filter_nulls": "Filter empty / non-empty",
+    "sort": "Sort",
+    "sort_index": "Sort by index",
+    "dropna": "Drop rows with empty values",
+    "fillna": "Fill empty values",
+    "drop_duplicates": "Drop duplicate rows",
+    "drop_columns": "Drop columns",
+    "rename": "Rename column",
+    "astype": "Change type",
+    "new_column": "New column (calculation)",
+    "reset_index": "Index to column (reset_index)",
+    "to_frame": "To table (to_frame)",
+    "groupby": "Group by",
+    "value_counts": "Count values",
+    "group_column": "Choose column",
+    "agg": {
+      "sum": "Sum",
+      "mean": "Mean",
+      "median": "Median",
+      "min": "Minimum",
+      "max": "Maximum",
+      "count": "Count",
+      "size": "Group size",
+      "nunique": "Distinct values",
+      "first": "First",
+      "last": "Last",
+      "std": "Std. deviation"
+    },
+    "str": {
+      "lower": "lowercase",
+      "upper": "UPPERCASE",
+      "strip": "Trim spaces",
+      "len": "Text length"
+    },
+    "dt": {
+      "year": "Year",
+      "month": "Month",
+      "day": "Day",
+      "dayofweek": "Day of week (0=Mon)"
+    },
+    "op": {
+      "contains": "contains",
+      "startswith": "starts with"
+    },
+    "which": {
+      "isna": "empty",
+      "notna": "not empty"
+    },
+    "field": {
+      "n": "Rows",
+      "random_state": "Seed",
+      "columns": "Columns",
+      "column": "Column",
+      "operator": "Condition",
+      "value": "Value",
+      "which": "Keep rows where it is",
+      "by": "Column",
+      "ascending": "Ascending",
+      "subset": "Only these columns",
+      "fill_value": "Fill with",
+      "new_name": "New name",
+      "dtype": "New type",
+      "left": "Column",
+      "right": "Column"
+    }
   },
   "errors": {
     "timeout": "The request took too long",
@@ -16,14 +160,5 @@
     "unknown_method": "Unknown request",
     "bad_request": "Invalid request",
     "protocol_mismatch": "Version mismatch"
-  },
-  "node": {
-    "state": {
-      "pending": "pending",
-      "computing": "computing…",
-      "error": "error",
-      "blocked": "blocked",
-      "ready": "ready"
-    }
   }
 }

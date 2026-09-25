@@ -11,6 +11,9 @@
     "lint": "oxlint src"
   },
   "dependencies": {
+    "@dagrejs/dagre": "3.1.1",
+    "@uwdata/flechette": "2.5.0",
+    "@xyflow/react": "12.11.6",
     "i18next": "26.4.2",
     "react": "19.3.0",
     "react-dom": "19.3.0",
@@ -25,6 +28,7 @@
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.1",
     "oxlint": "1.85.0",
+    "playwright-core": "1.63.0",
     "tailwindcss": "4.3.3",
     "typescript": "7.0.2",
     "vite": "8.3.0"

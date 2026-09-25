@@ -55,7 +55,11 @@ def register_session_methods(dispatcher: Dispatcher) -> None:
         mode = params.get("mode", "origin")
         return {"code": session.code(_id(params), mode="step" if mode == "step" else "origin")}
 
+    def preview(params: dict[str, Any], _buffers: list[bytes]) -> dict[str, Any]:
+        return session.preview(op_from_json(params.get("op")), name=params.get("name"))
+
     dispatcher.register("node.apply", apply)
+    dispatcher.register("op.preview", preview)
     dispatcher.register("node.summary", summary)
     dispatcher.register("node.window", window)
     dispatcher.register("node.code", code)

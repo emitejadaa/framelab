@@ -3,6 +3,8 @@
 @import "tailwindcss/utilities.css" layer(utilities) prefix(fl);
 @import "../theme/tokens.css";
 @import "./reset.css";
+@import "@xyflow/react/dist/style.css";
+@import "./app.css";
 
 @keyframes fl-spin {
   to {

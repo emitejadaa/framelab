@@ -1,13 +1,157 @@
 {
   "app": {
     "connecting": "Conectando…",
+    "reconnecting": "Reconectando…",
+    "loading": "Cargando…",
     "protocolMismatch": "Esta ventana de framelab no coincide con el paquete de Python instalado. Cerrala y volvé a ejecutar explore().",
     "error": "Algo salió mal"
   },
   "workbench": {
     "roots": "Datos",
     "shape": "{{rows}} × {{cols}}",
-    "rows": "{{count}} filas"
+    "rows": "{{count}} filas",
+    "drop_table": "Tabla",
+    "drop_plot": "Gráfico",
+    "plot_soon": "Los gráficos llegan en una próxima versión",
+    "hint": "Clic derecho en un nodo para operar · doble clic abre su tabla · arrastralo a ▦ Tabla"
+  },
+  "tabs": {
+    "workbench": "Workbench",
+    "close": "Cerrar"
+  },
+  "node": {
+    "state": {
+      "pending": "pendiente",
+      "computing": "calculando…",
+      "error": "error",
+      "blocked": "bloqueado (falló el padre)",
+      "ready": "listo"
+    }
+  },
+  "menu": {
+    "search": "Buscar operación…",
+    "node": "Nodo",
+    "open_table": "Abrir tabla",
+    "copy_code": "Copiar código"
+  },
+  "inspector": {
+    "empty": "Elegí un nodo",
+    "operations": "Operaciones…",
+    "memory": "Memoria",
+    "preview": "Primeras filas",
+    "columns": "Columnas ({{count}})",
+    "nulls": "{{count}} vacíos",
+    "groups": "Grupos",
+    "keys": "Claves"
+  },
+  "code": {
+    "title": "Código",
+    "origin": "Desde el origen",
+    "step": "Este paso",
+    "copy": "Copiar",
+    "copied": "Copiado ✓"
+  },
+  "table": {
+    "range": "{{from}}–{{to}} de {{total}}",
+    "empty": "Sin filas",
+    "as_text": "texto"
+  },
+  "form": {
+    "apply": "Aplicar",
+    "cancel": "Cancelar",
+    "code": "Código",
+    "optional": "opcional",
+    "yes": "Sí",
+    "missing": "Completá «{{field}}»",
+    "bad_number": "Escribí un número",
+    "bad_bool": "Escribí true o false",
+    "bad_date": "Escribí una fecha como 2024-01-31"
+  },
+  "ops": {
+    "category": {
+      "view": "Ver",
+      "select": "Seleccionar y filtrar",
+      "sort": "Ordenar",
+      "clean": "Limpiar",
+      "transform": "Transformar",
+      "group": "Agrupar",
+      "aggregate": "Resumir",
+      "text": "Texto",
+      "dates": "Fechas"
+    },
+    "head": "Primeras filas (head)",
+    "tail": "Últimas filas (tail)",
+    "sample": "Muestra aleatoria",
+    "describe": "Estadísticas (describe)",
+    "transpose": "Transponer (T)",
+    "select_columns": "Quedarse con columnas",
+    "column": "Una columna",
+    "filter": "Filtrar filas",
+    "filter_nulls": "Filtrar vacíos / no vacíos",
+    "sort": "Ordenar",
+    "sort_index": "Ordenar por índice",
+    "dropna": "Quitar filas con vacíos",
+    "fillna": "Rellenar vacíos",
+    "drop_duplicates": "Quitar filas duplicadas",
+    "drop_columns": "Quitar columnas",
+    "rename": "Renombrar columna",
+    "astype": "Cambiar tipo",
+    "new_column": "Columna nueva (cálculo)",
+    "reset_index": "Índice a columna (reset_index)",
+    "to_frame": "A tabla (to_frame)",
+    "groupby": "Agrupar por",
+    "value_counts": "Contar valores",
+    "group_column": "Elegir columna",
+    "agg": {
+      "sum": "Suma",
+      "mean": "Promedio",
+      "median": "Mediana",
+      "min": "Mínimo",
+      "max": "Máximo",
+      "count": "Cantidad",
+      "size": "Tamaño del grupo",
+      "nunique": "Valores distintos",
+      "first": "Primero",
+      "last": "Último",
+      "std": "Desvío estándar"
+    },
+    "str": {
+      "lower": "minúsculas",
+      "upper": "MAYÚSCULAS",
+      "strip": "Quitar espacios",
+      "len": "Largo del texto"
+    },
+    "dt": {
+      "year": "Año",
+      "month": "Mes",
+      "day": "Día",
+      "dayofweek": "Día de la semana (0=lun)"
+    },
+    "op": {
+      "contains": "contiene",
+      "startswith": "empieza con"
+    },
+    "which": {
+      "isna": "vacío",
+      "notna": "no vacío"
+    },
+    "field": {
+      "n": "Filas",
+      "random_state": "Semilla",
+      "columns": "Columnas",
+      "column": "Columna",
+      "operator": "Condición",
+      "value": "Valor",
+      "which": "Quedarse con filas donde está",
+      "by": "Columna",
+      "ascending": "Ascendente",
+      "subset": "Solo estas columnas",
+      "fill_value": "Rellenar con",
+      "new_name": "Nombre nuevo",
+      "dtype": "Tipo nuevo",
+      "left": "Columna",
+      "right": "Columna"
+    }
   },
   "errors": {
     "timeout": "La solicitud tardó demasiado",
@@ -16,14 +160,5 @@
     "unknown_method": "Solicitud desconocida",
     "bad_request": "Solicitud inválida",
     "protocol_mismatch": "Versiones incompatibles"
-  },
-  "node": {
-    "state": {
-      "pending": "pendiente",
-      "computing": "calculando…",
-      "error": "error",
-      "blocked": "bloqueado",
-      "ready": "listo"
-    }
   }
 }

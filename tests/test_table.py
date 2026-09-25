@@ -97,3 +97,17 @@ def test_large_frame_window_is_cheap():
     enc = WindowEncoder(df)
     data, meta = enc.encode(offset=1_999_990, limit=100)
     assert decode(data)[0].num_rows == 10 and meta["nrows_total"] == 2_000_000
+
+
+def test_summary_labels_are_json_encoded():
+    df = pd.DataFrame({("a", 1): [1], 2024: [2], "x": [3]})
+    labels = [c["label"] for c in summarize(df)["columns"]]
+    assert labels == [{"$": "tuple", "items": ["a", 1]}, 2024, "x"]
+
+
+def test_groupby_summary_lists_grouped_columns():
+    df = pd.DataFrame({"pais": ["AR", "UY"], "monto": [1.0, 2.0], "n": [1, 2]})
+    s = summarize(df.groupby("pais"))
+    assert s["grouped"] == "DataFrame" and s["ngroups"] == 2
+    assert [c["text"] for c in s["columns"]] == ["monto", "n"]
+    assert summarize(df.groupby("pais")["monto"])["grouped"] == "Series"

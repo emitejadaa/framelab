@@ -159,6 +159,21 @@ class Session:
         self._emit("node.upserted", info)
         return node
 
+    def preview(self, op: Op, *, name: str | None = None) -> dict[str, str]:
+        """The code ``apply(op)`` would show, without creating the node."""
+        op.validate()
+        with self._lock:
+            for parent in op.parents():
+                if parent not in self._nodes:
+                    raise UnknownNode(f"no node with id {parent!r}")
+            names = self.variable_names()
+            final = sanitize_identifier(name) if name else auto_node_name(op, names, self._by_name)
+        return {
+            "name": final,
+            "code": render_op(op, final, names).display,
+            "label": op_label(op, names),
+        }
+
     def _compute(self, nid: str) -> Any:
         with self._lock:
             node = self._nodes[nid]

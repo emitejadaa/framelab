@@ -2,6 +2,7 @@ import { type PointerEvent, useEffect, useMemo, useState } from "react";
 import { I18nextProvider } from "react-i18next";
 import { useStore } from "zustand";
 import { type HelloResult, PROTOCOL_VERSION, type SessionSnapshot } from "../generated/protocol";
+import { RpcProvider } from "../data/rpcContext";
 import { createI18n, pickLanguage } from "../i18n";
 import { StoreProvider } from "../state/context";
 import { createAppStore } from "../state/store";
@@ -94,6 +95,7 @@ export function App({ transport }: { transport: Transport }) {
 
   return (
     <StoreProvider value={store}>
+      <RpcProvider value={rpc}>
       <I18nextProvider i18n={i18n}>
         <PortalProvider value={portalEl}>
           <div
@@ -110,6 +112,7 @@ export function App({ transport }: { transport: Transport }) {
           </div>
         </PortalProvider>
       </I18nextProvider>
+      </RpcProvider>
     </StoreProvider>
   );
 }

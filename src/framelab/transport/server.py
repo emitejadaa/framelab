@@ -34,12 +34,20 @@ __all__ = ["COOKIE", "FramelabServer"]
 
 COOKIE = "framelab_token"
 
+FAVICON = (
+    "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 "
+    "16 16%27%3E%3Crect width=%2716%27 height=%2716%27 rx=%273%27 fill=%27%233b82f6%2"
+    "7/%3E%3Cpath d=%27M4 5h8M4 8h8M4 11h5%27 stroke=%27white%27 stroke-width=%271.6%"
+    "27/%3E%3C/svg%3E"
+)
+
 INDEX_TEMPLATE = """<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{title}</title>
+<link rel="icon" href="{icon}">
 <style>
 html,body,#app{{height:100%;margin:0}}
 body{{background:#fafafa}}
@@ -224,7 +232,7 @@ class FramelabServer:
 
     def _index_page(self) -> HTMLResponse:
         return HTMLResponse(
-            INDEX_TEMPLATE.format(title=html.escape(self.title)),
+            INDEX_TEMPLATE.format(title=html.escape(self.title), icon=FAVICON),
             headers={"Cache-Control": "no-store"},
         )
 
