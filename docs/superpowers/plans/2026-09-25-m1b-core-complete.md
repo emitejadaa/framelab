@@ -3078,7 +3078,10 @@ PROBES: dict[str, dict[str, tuple[tuple[Any, ...], dict[str, Any]]]] = {
     },
 }
 
-NEVER_CALL = frozenset({"to_clipboard", "plot", "hist", "boxplot", "style", "info", "pipe"})
+# Probing runs every other member, policy-denied mutators included (to record ``mutates``).
+NEVER_CALL = frozenset(
+    {"to_clipboard", "plot", "hist", "boxplot", "style", "info", "pipe", "eval", "query"}
+)
 SAME_AS_OWNER = frozenset(
     {"add", "sub", "mul", "div", "truediv", "floordiv", "mod", "pow", "radd", "rsub", "rmul",
      "rdiv", "rtruediv", "rfloordiv", "rmod", "rpow", "eq", "ne", "lt", "le", "gt", "ge",
@@ -3361,7 +3364,8 @@ def _no_required_args(bound: Any) -> bool:
 
 def probe(owner: str, name: str, kind: str) -> tuple[str, bool]:
     """(return kind, mutates) from running the member on tiny data."""
-    if kind == "classmethod" or not method_allowed(name) or name in NEVER_CALL:
+    writes = name.startswith("to_") and not method_allowed(name)  # IO: never run
+    if kind == "classmethod" or writes or name in NEVER_CALL:
         return "unknown", False
     instance, watch = OWNERS[owner][1]()
     before = copy.deepcopy(watch)

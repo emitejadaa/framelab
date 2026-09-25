@@ -21,3 +21,4 @@ test-results/
 .vscode/
 .idea/
 .DS_Store
+tools/.cache/

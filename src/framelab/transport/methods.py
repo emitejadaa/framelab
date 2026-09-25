@@ -181,6 +181,17 @@ def register_session_methods(dispatcher: Dispatcher) -> None:
             raise BadRequest("ids must be a list of node ids")
         return {"pinned": session.set_pins(ids)}
 
+    def catalog_members(params: dict[str, Any], _buffers: list[bytes]) -> dict[str, Any]:
+        from ..catalog import load
+
+        catalog = load()
+        owner = params.get("owner")
+        if owner not in catalog.owners:
+            raise BadRequest(f"owner must be one of {', '.join(catalog.owners)}")
+        members = [m.describe() for m in catalog.members(owner)]
+        return {"pandas_version": catalog.pandas_version, "members": members}
+
+    dispatcher.register("catalog.members", catalog_members)
     dispatcher.register("session.pins", pins)
     dispatcher.register("node.rename", rename)
     dispatcher.register("node.edit_as_new", edit_as_new)
