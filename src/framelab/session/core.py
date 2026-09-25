@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import secrets
 import threading
@@ -17,12 +18,13 @@ from ..codegen.render import op_label, render_op
 from ..codegen.style import CodeStyle, restyle
 from ..engine import ComputeLane, run_statement
 from ..errors import FramelabError
-from ..naming import RootSpec, auto_node_name, op_alias, sanitize_identifier
+from ..naming import RootSpec, auto_node_name, op_alias, sanitize_identifier, unique_name
 from ..ops import Op
 from ..options import OptionsRegistry
 from ..options import registry as default_registry
 from ..protocol.schema import SessionSnapshot
 from .figures import FigureStore
+from .history import Change, History, NodeRecord
 from .node import ErrorDetail, Node, NodeError, NodeState, NotReady, UnknownNode, classify
 
 __all__ = ["CannotDelete", "CannotRename", "NameTaken", "Session"]
@@ -63,6 +65,9 @@ class Session:
         self._encoders: dict[str, Any] = {}
         self.widget: Any = None
         self.plots = FigureStore(self)
+        self._history = History()
+        self._replaying = 0
+        self._batch: Change | None = None
         for spec in roots:
             if not isinstance(spec.obj, (pd.DataFrame, pd.Series)):
                 raise TypeError(
@@ -146,7 +151,9 @@ class Session:
             return {nid: n.name for nid, n in self._nodes.items()}
 
     # ---- graph ---------------------------------------------------------------------------
-    def apply(self, op: Op, *, name: str | None = None, node_id: str | None = None) -> Node:
+    def apply(
+        self, op: Op, *, name: str | None = None, node_id: str | None = None, force: bool = False
+    ) -> Node:
         """Create a node for ``op``; its result is computed on the compute lane."""
         op.validate()
         with self._lock:
@@ -169,6 +176,7 @@ class Session:
                 name_auto=auto,
                 label=op_label(op, names),
                 alias=op_alias(op, names),
+                force=force,
             )
             self._register(node)
             if any(self._nodes[p].state in _DEAD for p in node.parents):
@@ -179,6 +187,7 @@ class Session:
             else:
                 self._futures[node.id] = self._lane.submit(self._compute, node.id)
             info = node.info()
+            self._record(Change("create", nodes=[self._record_of(node)]))
         self._emit("node.upserted", info)
         return node
 
@@ -261,7 +270,8 @@ class Session:
         return [c[0] for c in changes]
 
     def _after_rename(self, changes: list[tuple[str, str, bool, str, bool]]) -> None:
-        """Hook for the workbench history."""
+        if changes:
+            self._record(Change("rename", names=changes))
 
     def descendants(self, key: str) -> list[str]:
         """The node and everything computed from it, in creation order."""
@@ -282,13 +292,18 @@ class Session:
             "figures": [f["name"] for f in figures],
         }
 
-    def delete(self, key: str) -> dict[str, Any]:
-        """Remove a node and all its descendants (roots are the input data and stay)."""
+    def delete(self, *keys: str) -> dict[str, Any]:
+        """Remove nodes and all their descendants (roots are the input data and stay)."""
         with self._lock:
-            nid = self._resolve(key)
-            if self._nodes[nid].is_root:
-                raise CannotDelete(f"{self._nodes[nid].name} is data passed to fl.explore()")
-            ids = self.descendants(nid)
+            starts = [self._resolve(k) for k in keys]
+            for nid in starts:
+                if self._nodes[nid].is_root:
+                    raise CannotDelete(f"{self._nodes[nid].name} is data passed to fl.explore()")
+            doomed: set[str] = set()
+            for nid in starts:
+                doomed.update(self.descendants(nid))
+            ids = [i for i in self._nodes if i in doomed]
+            records = [self._record_of(self._nodes[i]) for i in ids]
             for i in ids:
                 node = self._nodes.pop(i)
                 if self._by_name.get(node.name) == i:
@@ -300,8 +315,126 @@ class Session:
                     future.cancel()
             self.rev += 1
         self._emit("node.deleted", {"ids": ids})
+        before = {
+            f["id"]: self.plots.get(f["id"])["spec"]
+            for f in self.plots.infos()
+            if set(f["sources"]) & doomed
+        }
         figures = self.plots.drop_sources(set(ids))
+        self._record(Change("delete", nodes=records, figures=[(f, before[f]) for f in figures]))
         return {"ids": ids, "figures": figures}
+
+    # ---- history ------------------------------------------------------------------------------
+    @staticmethod
+    def _record_of(node: Node) -> NodeRecord:
+        return NodeRecord(node.id, node.name, node.name_auto, node.op, node.force)  # type: ignore[arg-type]
+
+    def _record(self, change: Change) -> None:
+        if self._replaying:
+            return
+        if self._batch is not None and change.kind == "create":
+            self._batch.nodes.extend(change.nodes)
+            return
+        self._history.push(change)
+
+    @contextlib.contextmanager
+    def batch(self) -> Iterator[None]:
+        """Every node created inside becomes one undo step."""
+        outer = self._batch is None
+        if outer:
+            self._batch = Change("create")
+        try:
+            yield
+        finally:
+            if outer:
+                change, self._batch = self._batch, None
+                if change is not None and change.nodes:
+                    self._history.push(change)
+
+    @contextlib.contextmanager
+    def _replay(self) -> Iterator[None]:
+        self._replaying += 1
+        try:
+            yield
+        finally:
+            self._replaying -= 1
+
+    def undo(self) -> bool:
+        with self._lock:
+            change = self._history.take_undo()
+        if change is None:
+            return False
+        with self._replay():
+            self._revert(change)
+        with self._lock:
+            self._history.undone(change)
+        self._emit("graph.history", self._history.info())
+        return True
+
+    def redo(self) -> bool:
+        with self._lock:
+            change = self._history.take_redo()
+        if change is None:
+            return False
+        with self._replay():
+            self._reapply(change)
+        with self._lock:
+            self._history.done(change)
+        self._emit("graph.history", self._history.info())
+        return True
+
+    def _revert(self, change: Change) -> None:
+        if change.kind == "create":
+            self._drop([r.id for r in change.nodes])
+        elif change.kind == "delete":
+            self._restore(change.nodes)
+            for fid, spec in change.figures:
+                self.plots.set_spec(fid, spec)
+        else:
+            for nid, old, old_auto, _new, _auto in reversed(change.names):
+                self._rename_to(nid, old, old_auto)
+
+    def _reapply(self, change: Change) -> None:
+        if change.kind == "create":
+            self._restore(change.nodes)
+        elif change.kind == "delete":
+            self._drop([r.id for r in change.nodes])
+        else:
+            for nid, _old, _old_auto, new, auto in change.names:
+                self._rename_to(nid, new, auto)
+
+    def _drop(self, ids: list[str]) -> None:
+        existing = [i for i in ids if i in self._nodes]
+        if existing:
+            self.delete(*existing)
+
+    def _restore(self, records: list[NodeRecord]) -> None:
+        for r in records:
+            if r.id in self._nodes:
+                continue
+            free = r.name not in self._by_name
+            node = self.apply(r.op, name=r.name if free else None, node_id=r.id, force=r.force)
+            with self._lock:
+                node.name_auto = r.name_auto
+
+    def _rename_to(self, nid: str, name: str, auto: bool) -> None:
+        with self._lock:
+            node = self._nodes.get(nid)
+            if node is None:
+                return
+            if self._by_name.get(name, nid) != nid:
+                name = unique_name(name, set(self._by_name))
+            self._set_name(node, name, auto)
+            names = self.variable_names()
+            touched = [node]
+            for d in self.descendants(nid)[1:]:
+                child = self._nodes[d]
+                child.label = op_label(child.op, names)  # type: ignore[arg-type]
+                touched.append(child)
+            self.rev += 1
+            infos = [n.info() for n in touched]
+        for info in infos:
+            self._emit("node.upserted", info)
 
     def _compute(self, nid: str) -> Any:
         with self._lock:
@@ -434,6 +567,7 @@ class Session:
                 "session_id": self.id,
                 "nodes": [n.info() for n in self._nodes.values()],
                 "figures": self.plots.infos(),  # type: ignore[typeddict-item]
+                "history": self._history.info(),  # type: ignore[typeddict-item]
                 "options": self._options.describe(),  # type: ignore[typeddict-item]
             }
 

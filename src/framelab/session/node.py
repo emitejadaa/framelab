@@ -63,6 +63,7 @@ class Node:
     error: ErrorDetail | None = None
     warnings: tuple[str, ...] = ()
     alias: str = ""  # the word this node's op adds to automatic names
+    force: bool = False  # created with the guards skipped
 
     @property
     def is_root(self) -> bool:

@@ -163,6 +163,8 @@ def register_session_methods(dispatcher: Dispatcher) -> None:
         return {"renamed": session.rename(_id(params), name)}
 
     dispatcher.register("node.rename", rename)
+    dispatcher.register("graph.undo", lambda params, _b: {"done": session.undo()})
+    dispatcher.register("graph.redo", lambda params, _b: {"done": session.redo()})
     dispatcher.register("node.delete_preview", delete_preview)
     dispatcher.register("node.delete", delete)
     dispatcher.register("formula.parse", formula)

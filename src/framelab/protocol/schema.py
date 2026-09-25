@@ -77,9 +77,15 @@ class FigureInfo(TypedDict):
     nlayers: int
 
 
+class HistoryInfo(TypedDict):
+    can_undo: bool
+    can_redo: bool
+
+
 class SessionSnapshot(TypedDict):
     rev: int
     session_id: str
     nodes: list[NodeInfo]
     figures: list[FigureInfo]
+    history: HistoryInfo
     options: list[OptionDescription]

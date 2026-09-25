@@ -71,10 +71,16 @@ export interface FigureInfo {
   nlayers: number;
 }
 
+export interface HistoryInfo {
+  can_undo: boolean;
+  can_redo: boolean;
+}
+
 export interface SessionSnapshot {
   rev: number;
   session_id: string;
   nodes: NodeInfo[];
   figures: FigureInfo[];
+  history: HistoryInfo;
   options: OptionDescription[];
 }

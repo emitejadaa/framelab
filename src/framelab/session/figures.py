@@ -181,6 +181,16 @@ class FigureStore:
                 return self._changed(doc)
             return doc.state()
 
+    def set_spec(self, fid: str, spec: dict[str, Any]) -> None:
+        """Put back a spec (graph undo); the figure's own history is not touched."""
+        with self._lock:
+            doc = self._docs.get(fid)
+            if doc is None:
+                return
+            doc.spec = normalize(spec, set(self._session.node_ids()))
+            doc.version += 1
+            self._changed(doc)
+
     def delete(self, fid: str) -> None:
         with self._lock:
             doc = self._doc(fid)
