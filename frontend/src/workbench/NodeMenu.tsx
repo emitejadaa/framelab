@@ -9,6 +9,7 @@ import { usePortalContainer } from "../ui/portal";
 import { applyOp } from "./applyOp";
 import { isTabular } from "./format";
 import { CATEGORY_ORDER, type OpSpec, opsFor } from "./opsCatalog";
+import { buildMemberOp, displayName, type Member, useMembers } from "./members";
 import { isPlottable, plotNode } from "./plotting";
 
 export function NodeMenu() {
@@ -22,9 +23,12 @@ export function NodeMenu() {
   const openPlot = useAppStore((s) => s.openPlot);
   const askDelete = useAppStore((s) => s.askDelete);
   const askRename = useAppStore((s) => s.askRename);
+  const openBrowser = useAppStore((s) => s.openBrowser);
+  const openMemberForm = useAppStore((s) => s.openMemberForm);
   const select = useAppStore((s) => s.select);
   const node = useAppStore((s) => s.snapshot?.nodes.find((n) => n.id === s.menu?.nodeId) ?? null);
   const summary = useSummary(node?.id ?? null, node?.state ?? "");
+  const pandas = useMembers(node?.id ?? null, node?.state ?? "");
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -45,6 +49,26 @@ export function NodeMenu() {
   const ops = ready ? opsFor(node.kind, summary.data) : [];
   const q = query.trim().toLowerCase();
   const visible = q ? ops.filter((op) => t(op.label).toLowerCase().includes(q) || op.key.includes(q)) : ops;
+  const pandasMatches = q
+    ? pandas.members
+        .filter((m) => displayName(m).toLowerCase().includes(q))
+        .sort((a, b) => Number(!a.name.startsWith(q)) - Number(!b.name.startsWith(q)) || a.name.localeCompare(b.name))
+        .slice(0, 12)
+    : [];
+
+  const runMember = async (member: Member) => {
+    if (member.kind === "method") {
+      openMemberForm({ nodeId: node.id, member });
+      return;
+    }
+    try {
+      const created = await applyOp(rpc, buildMemberOp(node.id, member, {}, []));
+      select(created.id);
+      closeMenu();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
 
   const run = async (op: OpSpec) => {
     if (op.fields.length > 0) {
@@ -82,7 +106,7 @@ export function NodeMenu() {
       <div className="fl-overlay-clear" onMouseDown={closeMenu} onContextMenu={(e) => e.preventDefault()} />
       <div className="fl-menu" style={{ left: x, top: y }} role="menu" onContextMenu={(e) => e.preventDefault()}>
         <div className="fl-menu-title">{node.name}</div>
-        {ready && ops.length > 0 ? (
+        {ready && (ops.length > 0 || pandas.members.length > 0) ? (
           <input
             autoFocus
             className="fl-input fl-menu-search"
@@ -90,7 +114,9 @@ export function NodeMenu() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && visible[0]) void run(visible[0]);
+              if (e.key !== "Enter") return;
+              if (visible[0]) void run(visible[0]);
+              else if (pandasMatches[0]) void runMember(pandasMatches[0]);
             }}
           />
         ) : null}
@@ -112,6 +138,33 @@ export function NodeMenu() {
               </div>
             );
           })}
+          {pandasMatches.length ? (
+            <div className="fl-menu-group">
+              <div className="fl-menu-heading">{t("menu.pandas_matches")}</div>
+              {pandasMatches.map((m) => (
+                <button
+                  key={`${m.accessor.join(".")}:${m.name}`}
+                  type="button"
+                  className="fl-menu-item"
+                  title={m.summary}
+                  onClick={() => void runMember(m)}
+                >
+                  <span className="fl-mono">
+                    {displayName(m)}
+                    {m.kind === "method" ? "()" : ""}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {ready && pandas.members.length ? (
+            <div className="fl-menu-group">
+              <button type="button" className="fl-menu-item" data-testid="all-pandas" onClick={() => openBrowser(node.id)}>
+                {t("menu.all_pandas")}
+                <span className="fl-menu-more">{pandas.members.length}</span>
+              </button>
+            </div>
+          ) : null}
           <div className="fl-menu-group">
             <div className="fl-menu-heading">{t("menu.node")}</div>
             {ready && isTabular(node.kind) ? (

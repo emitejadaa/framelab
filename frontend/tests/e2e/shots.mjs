@@ -1,0 +1,22 @@
+// Screenshots of the pandas browser and a generated form (manual review, not CI).
+import { chromium } from "playwright-core";
+const [url, out] = process.argv.slice(2);
+const browser = await chromium.launch({ executablePath: process.env.FRAMELAB_BROWSER || "/usr/bin/chromium" });
+const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, locale: "es-AR" });
+await page.goto(url);
+const root = page.locator('[data-testid="node-card"]', { hasText: "ventas" }).first();
+await root.waitFor({ timeout: 20000 });
+await root.click({ button: "right" });
+await page.locator(".fl-menu-search").fill("pivot");
+await page.waitForTimeout(500);
+await page.screenshot({ path: `${out}/menu-search.png` });
+await page.keyboard.press("Escape");
+await root.click({ button: "right" });
+await page.locator('[data-testid="all-pandas"]').click();
+await page.waitForTimeout(600);
+await page.screenshot({ path: `${out}/browser.png` });
+await page.locator('[data-testid="member-browser"] input').fill("pivot_table");
+await page.locator('[data-testid="member-pivot_table"]').click();
+await page.waitForTimeout(600);
+await page.screenshot({ path: `${out}/member-form.png` });
+await browser.close();

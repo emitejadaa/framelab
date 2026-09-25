@@ -43,7 +43,9 @@
     "delete_short": "Eliminar",
     "cancel": "Cancelar cálculo",
     "retry": "Reintentar",
-    "rename": "Renombrar…"
+    "rename": "Renombrar…",
+    "all_pandas": "Todas las operaciones de pandas…",
+    "pandas_matches": "pandas"
   },
   "inspector": {
     "empty": "Elegí un nodo",
@@ -390,5 +392,19 @@
     "title": "Renombrar {{name}}",
     "help": "Es el nombre de la variable en el código; los nodos derivados con nombre automático lo siguen.",
     "confirm": "Renombrar"
+  },
+  "browser": {
+    "title": "Operaciones de pandas · {{name}}",
+    "search": "Buscar un método o atributo (nombre o descripción)…",
+    "all": "Todas",
+    "empty": "Nada coincide"
+  },
+  "member": {
+    "required": "obligatorio",
+    "default": "por defecto: {{value}}",
+    "help": "Solo se pasan los parámetros que completes; el resto queda como en pandas.",
+    "missing": "Completá «{{name}}»",
+    "bad_number": "«{{name}}» tiene que ser un número",
+    "frame_none": "— elegí una tabla —"
   }
 }

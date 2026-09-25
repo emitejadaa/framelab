@@ -1,5 +1,6 @@
 import { createStore } from "zustand/vanilla";
 import type { HelloResult, SessionSnapshot } from "../generated/protocol";
+import type { Member } from "../workbench/members";
 
 export type ConnectionState = "connecting" | "ready" | "mismatch" | "error";
 export type View =
@@ -18,6 +19,11 @@ export interface FormState {
   opKey: string;
 }
 
+export interface MemberFormState {
+  nodeId: string;
+  member: Member;
+}
+
 export interface AppState {
   connection: ConnectionState;
   error: string | null;
@@ -31,6 +37,8 @@ export interface AppState {
   form: FormState | null;
   deleting: string | null;
   renaming: string | null;
+  browser: string | null;
+  memberForm: MemberFormState | null;
   setConnection(connection: ConnectionState, error?: string | null): void;
   setHello(hello: HelloResult): void;
   setSnapshot(snapshot: SessionSnapshot): void;
@@ -46,6 +54,8 @@ export interface AppState {
   closeForm(): void;
   askDelete(nodeId: string | null): void;
   askRename(nodeId: string | null): void;
+  openBrowser(nodeId: string | null): void;
+  openMemberForm(form: MemberFormState | null): void;
 }
 
 export type AppStore = ReturnType<typeof createAppStore>;
@@ -65,6 +75,8 @@ export function createAppStore() {
     form: null,
     deleting: null,
     renaming: null,
+    browser: null,
+    memberForm: null,
     setConnection: (connection, error = null) => set({ connection, error }),
     setHello: (hello) => set({ hello }),
     setSnapshot: (snapshot) =>
@@ -85,6 +97,8 @@ export function createAppStore() {
           menu: s.menu && nodes.has(s.menu.nodeId) ? s.menu : null,
           form: s.form && nodes.has(s.form.nodeId) ? s.form : null,
           renaming: s.renaming && nodes.has(s.renaming) ? s.renaming : null,
+          browser: s.browser && nodes.has(s.browser) ? s.browser : null,
+          memberForm: s.memberForm && nodes.has(s.memberForm.nodeId) ? s.memberForm : null,
         };
       }),
     select: (selectedId) => set({ selectedId }),
@@ -118,5 +132,7 @@ export function createAppStore() {
     closeForm: () => set({ form: null }),
     askDelete: (deleting) => set({ deleting, menu: null }),
     askRename: (renaming) => set({ renaming, menu: null }),
+    openBrowser: (browser) => set({ browser, menu: null }),
+    openMemberForm: (memberForm) => set({ memberForm, menu: null, browser: null }),
   }));
 }

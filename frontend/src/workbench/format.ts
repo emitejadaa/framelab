@@ -6,6 +6,7 @@ export const KIND_ICON: Record<string, string> = {
   Series: "≡",
   GroupBy: "⊞",
   Index: "⋮",
+  Window: "∿",
   Value: "#",
   Unknown: "·",
 };

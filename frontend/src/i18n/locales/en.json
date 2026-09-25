@@ -43,7 +43,9 @@
     "delete_short": "Delete",
     "cancel": "Cancel",
     "retry": "Retry",
-    "rename": "Rename…"
+    "rename": "Rename…",
+    "all_pandas": "All pandas operations…",
+    "pandas_matches": "pandas"
   },
   "inspector": {
     "empty": "Select a node",
@@ -390,5 +392,19 @@
     "title": "Rename {{name}}",
     "help": "It is the variable name in the code; derived nodes with automatic names follow it.",
     "confirm": "Rename"
+  },
+  "browser": {
+    "title": "pandas operations · {{name}}",
+    "search": "Search a method or attribute (name or description)…",
+    "all": "All",
+    "empty": "Nothing matches"
+  },
+  "member": {
+    "required": "required",
+    "default": "default: {{value}}",
+    "help": "Only the parameters you fill in are passed; the rest stay as in pandas.",
+    "missing": "Fill in “{{name}}”",
+    "bad_number": "“{{name}}” must be a number",
+    "frame_none": "— choose a table —"
   }
 }

@@ -23,6 +23,8 @@ export const colRef = (label: Json): Value => ({ t: "col", label });
 export const listOf = (items: Value[]): Value => ({ t: "list", items });
 export const dictOf = (pairs: [Value, Value][]): Value => ({ t: "dict", items: pairs });
 export const fn = (name: string, ns: "str" | "np" = "str"): Value => ({ t: "func", name, ns });
+/** Another node (for example the right-hand table of a merge). */
+export const nodeRef = (id: string): Value => ({ t: "node", id });
 export const thisFrame = (): Value => ({ t: "this" });
 export const getcol = (label: Json): Value => ({ t: "getcol", base: thisFrame(), label });
 export const method = (

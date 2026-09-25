@@ -180,3 +180,18 @@
 .fl-root .fl-card[data-state="freed"] { opacity: .75; }
 .fl-root .fl-card[data-state="cancelled"] { border-style: dashed; }
 .fl-root .fl-hint-inline { font-size: 11.5px; }
+/* ---- pandas member browser and generated forms ---- */
+.fl-root .fl-browser { width: min(900px, calc(100vw - 32px)); height: min(640px, calc(100vh - 48px)); }
+.fl-root .fl-browser-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 230px 1fr; gap: 10px; }
+.fl-root .fl-browser-cats { overflow: auto; display: flex; flex-direction: column; gap: 1px; border-right: 1px solid var(--fl-border); padding-right: 8px; }
+.fl-root .fl-browser-cats button { display: flex; justify-content: space-between; gap: 8px; padding: 4px 8px; border-radius: 5px; text-align: left; font-size: 12.5px; }
+.fl-root .fl-browser-cats button:hover { background: var(--fl-hover); }
+.fl-root .fl-browser-cats button[data-active="true"] { background: color-mix(in srgb, var(--fl-accent) 14%, transparent); }
+.fl-root .fl-browser-list { overflow: auto; display: flex; flex-direction: column; gap: 2px; }
+.fl-root .fl-browser-item { display: grid; grid-template-columns: minmax(170px, auto) 1fr auto; gap: 12px; align-items: baseline; padding: 6px 8px; border-radius: 6px; text-align: left; }
+.fl-root .fl-browser-item:hover { background: var(--fl-hover); }
+.fl-root .fl-browser-summary { color: var(--fl-muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fl-root .fl-badge-muted { color: var(--fl-muted); }
+.fl-root .fl-member-form { width: min(620px, calc(100vw - 32px)); }
+.fl-root .fl-member-summary { font-size: 12.5px; }
+.fl-root .fl-required { color: var(--fl-danger); }

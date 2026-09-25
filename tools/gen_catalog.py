@@ -359,6 +359,17 @@ SAMPLED = frozenset(
 )  # fmt: skip
 
 COLUMNS = frozenset({"by", "subset", "on", "left_on", "right_on", "id_vars", "value_vars"})
+# Per-member corrections where a parameter name alone does not tell what it holds.
+OVERRIDES: dict[tuple[str, str], dict[str, str]] = {
+    ("DataFrame", "pivot_table"): {"values": "columns", "index": "columns"},
+    ("DataFrame", "pivot"): {"index": "column", "values": "columns"},
+    ("DataFrame", "set_index"): {"keys": "columns"},
+    ("DataFrame", "explode"): {"column": "columns"},
+    ("DataFrame", "melt"): {"var_name": "text", "value_name": "text"},
+    ("DataFrame", "duplicated"): {"subset": "columns"},
+    ("DataFrame", "value_counts"): {"subset": "columns"},
+    ("DataFrameGroupBy", "value_counts"): {"subset": "columns"},
+}
 FRAMES = frozenset({"other", "right", "objs", "left"})
 FREQ = frozenset({"freq", "rule", "offset"})
 FUNCS = frozenset({"func", "aggfunc", "arg"})
@@ -508,6 +519,10 @@ def widget(name: str, annotation: str, default: Any, choices: list[Any]) -> str:
     if name == "axis":
         return "axis"
     if name in COLUMNS:
+        return "columns"
+    mapping = any(word in annotation for word in ("Renamer", "Mapping", "dict", "Callable"))
+    # column labels (drop, nlargest, pivot…), not rename's mapper
+    if name == "columns" and not mapping:
         return "columns"
     if name in {"column", "col"}:
         return "column"
@@ -673,6 +688,10 @@ def member_entry(
     if kind in ("method", "classmethod"):
         func = raw.__func__ if isinstance(raw, (classmethod, staticmethod)) else raw
         entry["params"] = params_of(func)
+        for param in entry["params"]:
+            fixed = OVERRIDES.get((owner, name), {}).get(param["name"])
+            if fixed:
+                param["widget"] = fixed
     returns, mutates = probe(owner, name, kind)
     if returns == "unknown" and name in SAME_AS_OWNER and owner in ("DataFrame", "Series", "Index"):
         returns = owner

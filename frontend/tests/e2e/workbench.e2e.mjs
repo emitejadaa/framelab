@@ -49,9 +49,25 @@ const rows = await page.locator(".fl-tableview .fl-table tbody tr").count();
 if (rows !== 3) await fail(`expected 3 rows, got ${rows}`);
 await page.screenshot({ path: `${shots}/table.png` });
 
-// undo / redo from the keyboard on the workbench
+// every pandas operation: browser -> nlargest(n=2, columns="monto") with a generated form
 await page.getByRole("button", { name: /← Workbench/ }).click();
-await created.waitFor({ timeout: 5000 }).catch(() => fail("back on the workbench, the node is missing"));
+await root.click({ button: "right" });
+await page.locator('[data-testid="all-pandas"]').click();
+await page.locator('[data-testid="member-browser"] input').fill("nlargest");
+await page.locator('[data-testid="member-nlargest"]').click();
+const form = page.locator('[data-testid="member-form"]');
+await form.locator(".fl-field", { hasText: /^n/ }).first().locator("input").fill("2");
+await form.locator(".fl-field", { hasText: "columns" }).getByLabel(/monto/).check();
+await form.locator(".fl-code-preview", { hasText: 'ventas.nlargest(n=2, columns="monto")' }).waitFor({ timeout: 5000 })
+  .catch(() => fail("generated form did not preview ventas.nlargest(n=2, columns=\"monto\")"));
+await form.getByRole("button", { name: "Aplicar", exact: true }).click();
+await page.locator('[data-testid="node-card"]', { hasText: "ventas_nlargest" }).waitFor({ timeout: 10000 })
+  .catch(() => fail("nlargest node did not appear"));
+
+// undo / redo from the keyboard on the workbench
+const nlargest = page.locator('[data-testid="node-card"]', { hasText: "ventas_nlargest" });
+await page.keyboard.press("Control+z");
+await nlargest.waitFor({ state: "detached", timeout: 5000 }).catch(() => fail("Ctrl+Z did not undo nlargest"));
 await page.keyboard.press("Control+z");
 await created.waitFor({ state: "detached", timeout: 5000 }).catch(() => fail("Ctrl+Z did not undo the new node"));
 await page.keyboard.press("Control+y");
