@@ -90,7 +90,7 @@ jobs:
       url: https://pypi.org/project/framelab/
     permissions:
       id-token: write # PyPI trusted publishing: no token stored in GitHub
-      contents: read
+      contents: write # a GitHub release with the built files
     steps:
       - uses: actions/checkout@v4
         with:
@@ -116,10 +116,12 @@ jobs:
         with:
           python-version: "3.14"
       - name: stamp the version
+        id: stamp
         if: steps.changed.outputs.publish == 'true'
         run: |
           version="0.0.$(git rev-list --count HEAD)"
           sed -i "s/^__version__ = .*/__version__ = \"$version\"/" src/framelab/__init__.py
+          echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "Publishing framelab $version"
       - name: build the sdist and the wheel
         if: steps.changed.outputs.publish == 'true'
@@ -133,5 +135,15 @@ jobs:
           /tmp/check/bin/pip install dist/*.whl
           /tmp/check/bin/python -c "import framelab; print(framelab.__version__)"
           /tmp/check/bin/framelab --help
+      - name: GitHub release with the wheel and the sdist
+        if: steps.changed.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.stamp.outputs.version }}
+        run: |
+          gh release create "v$VERSION" dist/* \
+            --target "${{ github.sha }}" \
+            --title "framelab $VERSION" \
+            --notes "pip install framelab==$VERSION (or download the .whl below and pip install it)"
       - uses: pypa/gh-action-pypi-publish@release/v1
         if: steps.changed.outputs.publish == 'true'
