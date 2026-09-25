@@ -50,9 +50,11 @@ def test_evicted_nodes_are_recomputed_when_used(tiny_cache):
     s = tiny_cache
     doubled = s.apply(setcol("n1", "b", mul(col("a"), 2)))
     expected = FRAME.assign(b=FRAME["a"] * 2)
-    pd.testing.assert_frame_equal(s.wait(doubled.id), expected)
+    # nobody asked for it yet: computed, then freed at once (the budget is one byte)
     assert wait_for(lambda: s.node(doubled.id).state is NodeState.FREED)
     pd.testing.assert_frame_equal(s.wait(doubled.id, timeout=5), expected)
+    # what was just asked for stays until the next result needs the room
+    assert s.node(doubled.id).state is NodeState.READY
     assert s.node("n1").state is NodeState.READY  # roots are never freed
 
 
@@ -72,7 +74,6 @@ def test_evicted_parent_is_recomputed_for_a_queued_child(tiny_cache):
     """Review focus 2: children and table windows recompute freed parents transparently."""
     s = tiny_cache
     doubled = s.apply(setcol("n1", "b", mul(col("a"), 2)))
-    s.wait(doubled.id)
     assert wait_for(lambda: s.node(doubled.id).state is NodeState.FREED)
     total = s.apply(call(doubled.id, "sum", numeric_only=True))
     assert s.wait(total.id, timeout=5)["b"] == FRAME["a"].sum() * 2
@@ -83,7 +84,6 @@ def test_evicted_parent_is_recomputed_for_a_queued_child(tiny_cache):
 def test_figures_draw_freed_sources(tiny_cache):
     s = tiny_cache
     doubled = s.apply(setcol("n1", "b", mul(col("a"), 2)))
-    s.wait(doubled.id)
     assert wait_for(lambda: s.node(doubled.id).state is NodeState.FREED)
     fig = s.plots.create(doubled.id)
     spec = fig["spec"]
