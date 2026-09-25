@@ -49,6 +49,14 @@ const rows = await page.locator(".fl-tableview .fl-table tbody tr").count();
 if (rows !== 3) await fail(`expected 3 rows, got ${rows}`);
 await page.screenshot({ path: `${shots}/table.png` });
 
+// undo / redo from the keyboard on the workbench
+await page.getByRole("button", { name: /← Workbench/ }).click();
+await created.waitFor({ timeout: 5000 }).catch(() => fail("back on the workbench, the node is missing"));
+await page.keyboard.press("Control+z");
+await created.waitFor({ state: "detached", timeout: 5000 }).catch(() => fail("Ctrl+Z did not undo the new node"));
+await page.keyboard.press("Control+y");
+await created.waitFor({ timeout: 5000 }).catch(() => fail("Ctrl+Y did not redo the new node"));
+
 if (errors.length) await fail("console errors");
 console.log("OK");
 await browser.close();

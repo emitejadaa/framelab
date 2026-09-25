@@ -9,7 +9,7 @@ export type CardData = { info: NodeInfo };
 function NodeCardImpl({ data, selected }: NodeProps & { data: CardData }) {
   const { t } = useTranslation();
   const { info } = data;
-  const busy = info.state === "pending" || info.state === "computing";
+  const busy = info.state === "pending" || info.state === "computing" || Boolean(info.cancelling);
   return (
     <div
       className="fl-card"
@@ -26,7 +26,11 @@ function NodeCardImpl({ data, selected }: NodeProps & { data: CardData }) {
         <div className="fl-card-name">{info.name}</div>
         <div className="fl-card-meta">
           {busy ? <span className="fl-spin" /> : null}
-          {info.state === "ready" ? shapeText(info, t) : t(`node.state.${info.state}`)}
+          {info.cancelling
+            ? t("node.cancelling")
+            : info.state === "ready"
+              ? shapeText(info, t)
+              : t(`node.state.${info.state}`)}
         </div>
       </div>
       <Handle type="source" position={Position.Right} className="fl-handle" />

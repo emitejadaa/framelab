@@ -5,6 +5,7 @@ import { PlotView } from "../plot/PlotView";
 import { Canvas } from "../workbench/Canvas";
 import { CodePanel } from "../workbench/CodePanel";
 import { DeleteDialog } from "../workbench/DeleteDialog";
+import { RenameDialog } from "../workbench/RenameDialog";
 import { Inspector } from "../workbench/Inspector";
 import { NodeMenu } from "../workbench/NodeMenu";
 import { OpForm } from "../workbench/OpForm";
@@ -98,6 +99,7 @@ export function Shell() {
       <NodeMenu />
       <OpForm />
       <DeleteDialog />
+      <RenameDialog />
     </div>
   );
 }

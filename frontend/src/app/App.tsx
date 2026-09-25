@@ -82,9 +82,22 @@ export function App({ transport }: { transport: Transport }) {
           .catch(() => undefined);
       }, 50);
     });
+    // Keep what the UI shows in memory: open tables, the selection and open figures' sources.
+    const offPins = store.subscribe((s, prev) => {
+      const same =
+        s.tables === prev.tables &&
+        s.plots === prev.plots &&
+        s.selectedId === prev.selectedId &&
+        s.snapshot?.figures === prev.snapshot?.figures;
+      if (same) return;
+      const figures = (s.snapshot?.figures ?? []).filter((f) => s.plots.includes(f.id));
+      const ids = new Set([...s.tables, ...(s.selectedId ? [s.selectedId] : []), ...figures.flatMap((f) => f.sources)]);
+      void rpc.request("session.pins", { ids: [...ids] }).catch(() => undefined);
+    });
     return () => {
       offStatus();
       offNodes();
+      offPins();
       clearTimeout(refresh);
       rpc.dispose();
     };

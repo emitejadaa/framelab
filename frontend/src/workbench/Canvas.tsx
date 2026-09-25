@@ -47,6 +47,8 @@ function CanvasInner() {
   const openMenu = useAppStore((s) => s.openMenu);
   const closeMenu = useAppStore((s) => s.closeMenu);
   const askDelete = useAppStore((s) => s.askDelete);
+  const askRename = useAppStore((s) => s.askRename);
+  const history = useAppStore((s) => s.snapshot?.history);
   const moved = useRef<Record<string, { x: number; y: number }>>({});
   const dragStart = useRef<{ x: number; y: number } | null>(null);
   const tableBox = useRef<HTMLDivElement>(null);
@@ -111,9 +113,21 @@ function CanvasInner() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.key !== "Delete" && e.key !== "Backspace") || typing(e.target) || !selectedId) return;
-      const node = info(selectedId);
-      if (node && node.parents.length > 0) askDelete(node.id);
+      if (typing(e.target)) return;
+      const key = e.key.toLowerCase();
+      if ((e.ctrlKey || e.metaKey) && (key === "z" || key === "y")) {
+        e.preventDefault();
+        const redo = key === "y" || e.shiftKey;
+        void rpc.request(redo ? "graph.redo" : "graph.undo").catch(() => undefined);
+        return;
+      }
+      const node = selectedId ? info(selectedId) : undefined;
+      if (!node || node.parents.length === 0) return;
+      if (e.key === "Delete" || e.key === "Backspace") askDelete(node.id);
+      else if (e.key === "F2") {
+        e.preventDefault();
+        askRename(node.id);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -188,6 +202,32 @@ function CanvasInner() {
         <MiniMap pannable zoomable className="fl-minimap" />
         <Controls showInteractive={false} />
       </ReactFlow>
+      <div className="fl-canvas-tools">
+        <button
+          type="button"
+          className="fl-btn"
+          disabled={!history?.can_undo}
+          title={`${t("workbench.undo")} (Ctrl+Z)`}
+          data-testid="undo"
+          onClick={() => void rpc.request("graph.undo")}
+        >
+          ↶
+        </button>
+        <button
+          type="button"
+          className="fl-btn"
+          disabled={!history?.can_redo}
+          title={`${t("workbench.redo")} (Ctrl+Y)`}
+          onClick={() => void rpc.request("graph.redo")}
+        >
+          ↷
+        </button>
+        {infos.some((n) => ["error", "blocked", "cancelled"].includes(n.state)) ? (
+          <button type="button" className="fl-btn fl-btn-quiet-danger" onClick={() => void rpc.request("graph.clear_failed")}>
+            {t("workbench.clear_failed")}
+          </button>
+        ) : null}
+      </div>
       <div className="fl-dropzones">
         <div ref={tableBox} className="fl-dropzone" data-over={over === "table" ? "true" : "false"} data-testid="drop-table">
           ▦ {t("workbench.drop_table")}

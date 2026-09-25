@@ -11,6 +11,18 @@ export function CodePanel() {
   const [mode, setMode] = useState<"origin" | "step">("origin");
   const [code, setCode] = useState("");
   const [copied, setCopied] = useState(false);
+  const nodes = useAppStore((s) => s.snapshot?.nodes);
+  const download = async (format: "py" | "ipynb") => {
+    const { result } = await rpc.request<{ text: string }>("session.export", { format });
+    const type = format === "py" ? "text/x-python" : "application/x-ipynb+json";
+    const url = URL.createObjectURL(new Blob([result.text], { type }));
+    const a = document.createElement("a");
+    a.href = url;
+    const roots = (nodes ?? []).filter((n) => n.parents.length === 0).map((n) => n.name);
+    a.download = `${roots.join("_") || "framelab"}.${format}`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  };
 
   useEffect(() => {
     if (!node) return;
@@ -36,6 +48,12 @@ export function CodePanel() {
           ))}
         </div>
         <span className="fl-spacer" />
+        <span className="fl-muted fl-hint-inline">{t("code.export_title")}</span>
+        {(["py", "ipynb"] as const).map((format) => (
+          <button key={format} type="button" className="fl-btn" onClick={() => void download(format)}>
+            ↓ .{format}
+          </button>
+        ))}
         <button
           type="button"
           className="fl-btn"

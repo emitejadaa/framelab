@@ -12,7 +12,10 @@
     "rows": "{{count}} filas",
     "drop_table": "Tabla",
     "drop_plot": "Gráfico",
-    "hint": "Clic derecho en un nodo para operar · doble clic abre su tabla · arrastralo a ▦ Tabla o ▟ Gráfico · Supr lo borra"
+    "hint": "Clic derecho en un nodo para operar · doble clic abre su tabla · arrastralo a ▦ Tabla o ▟ Gráfico · Supr lo borra",
+    "undo": "Deshacer",
+    "redo": "Rehacer",
+    "clear_failed": "Quitar nodos con error"
   },
   "tabs": {
     "workbench": "Workbench",
@@ -24,8 +27,11 @@
       "computing": "calculando…",
       "error": "error",
       "blocked": "bloqueado (falló el padre)",
-      "ready": "listo"
-    }
+      "ready": "listo",
+      "cancelled": "cancelado",
+      "freed": "liberado (se recalcula al usarlo)"
+    },
+    "cancelling": "cancelando…"
   },
   "menu": {
     "search": "Buscar operación…",
@@ -34,7 +40,10 @@
     "copy_code": "Copiar código",
     "plot": "Graficar",
     "delete": "Eliminar…",
-    "delete_short": "Eliminar"
+    "delete_short": "Eliminar",
+    "cancel": "Cancelar cálculo",
+    "retry": "Reintentar",
+    "rename": "Renombrar…"
   },
   "inspector": {
     "empty": "Elegí un nodo",
@@ -51,7 +60,8 @@
     "origin": "Desde el origen",
     "step": "Este paso",
     "copy": "Copiar",
-    "copied": "Copiado ✓"
+    "copied": "Copiado ✓",
+    "export_title": "Toda la sesión:"
   },
   "table": {
     "range": "{{from}}–{{to}} de {{total}}",
@@ -68,7 +78,8 @@
     "bad_number": "Escribí un número",
     "bad_bool": "Escribí true o false",
     "bad_date": "Escribí una fecha como 2024-01-31",
-    "bad_formula": "Revisá la fórmula"
+    "bad_formula": "Revisá la fórmula",
+    "force": "Aplicar de todos modos"
   },
   "ops": {
     "category": {
@@ -167,7 +178,12 @@
     "invalid_figure": "Configuración de gráfico inválida",
     "unknown_figure": "La figura ya no existe",
     "cannot_delete": "No se puede eliminar",
-    "invalid_formula": "Fórmula inválida"
+    "invalid_formula": "Fórmula inválida",
+    "too_big": "Resultado demasiado grande",
+    "string_aggregation": "Agregación sobre columnas de texto",
+    "name_taken": "Ese nombre ya existe",
+    "cannot_rename": "No se puede renombrar",
+    "cannot_edit": "No se puede editar"
   },
   "plot": {
     "kind": {
@@ -369,5 +385,10 @@
       "where": "si… entonces… si no…",
       "maximum": "el mayor de dos valores"
     }
+  },
+  "rename": {
+    "title": "Renombrar {{name}}",
+    "help": "Es el nombre de la variable en el código; los nodos derivados con nombre automático lo siguen.",
+    "confirm": "Renombrar"
   }
 }

@@ -175,3 +175,8 @@
 .fl-root .fl-kinds { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .fl-root .fl-kind { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px; border: 1px solid var(--fl-border); border-radius: 8px; font-size: 11.5px; background: var(--fl-bg); }
 .fl-root .fl-kind:disabled { opacity: .45; }
+/* ---- history, cancel, rename ---- */
+.fl-root .fl-canvas-tools { position: absolute; top: 10px; left: 10px; z-index: 5; display: flex; gap: 6px; }
+.fl-root .fl-card[data-state="freed"] { opacity: .75; }
+.fl-root .fl-card[data-state="cancelled"] { border-style: dashed; }
+.fl-root .fl-hint-inline { font-size: 11.5px; }

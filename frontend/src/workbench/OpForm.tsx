@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { useSummary } from "../data/hooks";
+import { RpcError } from "../transport/rpc";
 import { useRpc } from "../data/rpcContext";
 import type { OpJson } from "../ops/build";
 import { useAppStore } from "../state/context";
@@ -29,6 +30,10 @@ export function OpForm() {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // A guard refused the op (too big, or aggregating text): the user may run it anyway.
+  const [forceable, setForceable] = useState(false);
+  const guarded = (err: unknown) =>
+    err instanceof RpcError && (err.code === "too_big" || err.code === "string_aggregation");
 
   useEffect(() => {
     if (op) setValues(defaults(op));
@@ -72,9 +77,14 @@ export function OpForm() {
           if (alive) {
             setPreview(result);
             setProblem(null);
+            setForceable(false);
           }
         })
-        .catch((err) => alive && setProblem(err instanceof Error ? err.message : String(err)));
+        .catch((err) => {
+          if (!alive) return;
+          setProblem(err instanceof Error ? err.message : String(err));
+          setForceable(guarded(err));
+        });
     }, 120);
     return () => {
       alive = false;
@@ -85,15 +95,16 @@ export function OpForm() {
   if (!form || !op || !node || !portal) return null;
   const columns = summary.data?.columns ?? [];
 
-  const submit = async () => {
+  const submit = async (force = false) => {
     if (!built.op || busy) return;
     setBusy(true);
     try {
-      const created = await applyOp(rpc, built.op);
+      const created = await applyOp(rpc, built.op, { force });
       select(created.id);
       closeForm();
     } catch (err) {
       setProblem(err instanceof Error ? err.message : String(err));
+      setForceable(guarded(err));
     } finally {
       setBusy(false);
     }
@@ -202,6 +213,11 @@ export function OpForm() {
           <button type="button" className="fl-btn" onClick={closeForm}>
             {t("form.cancel")}
           </button>
+          {forceable ? (
+            <button type="button" className="fl-btn fl-btn-quiet-danger" disabled={!built.op || busy} onClick={() => void submit(true)}>
+              {t("form.force")}
+            </button>
+          ) : null}
           <button type="submit" className="fl-btn fl-btn-primary" disabled={!built.op || busy}>
             {t("form.apply")}
           </button>

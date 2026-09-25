@@ -21,6 +21,7 @@ export function NodeMenu() {
   const openTable = useAppStore((s) => s.openTable);
   const openPlot = useAppStore((s) => s.openPlot);
   const askDelete = useAppStore((s) => s.askDelete);
+  const askRename = useAppStore((s) => s.askRename);
   const select = useAppStore((s) => s.select);
   const node = useAppStore((s) => s.snapshot?.nodes.find((n) => n.id === s.menu?.nodeId) ?? null);
   const summary = useSummary(node?.id ?? null, node?.state ?? "");
@@ -126,6 +127,30 @@ export function NodeMenu() {
             <button type="button" className="fl-menu-item" onClick={() => void copyCode()}>
               {t("menu.copy_code")}
             </button>
+            {node.state === "pending" || node.state === "computing" ? (
+              <button
+                type="button"
+                className="fl-menu-item"
+                onClick={() => void rpc.request("node.cancel", { id: node.id }).then(closeMenu)}
+              >
+                {t("menu.cancel")}
+              </button>
+            ) : null}
+            {["error", "blocked", "cancelled"].includes(node.state) ? (
+              <button
+                type="button"
+                className="fl-menu-item"
+                onClick={() => void rpc.request("node.retry", { id: node.id }).then(closeMenu)}
+              >
+                {t("menu.retry")}
+              </button>
+            ) : null}
+            {node.parents.length > 0 ? (
+              <button type="button" className="fl-menu-item" onClick={() => askRename(node.id)}>
+                {t("menu.rename")}
+                <span className="fl-menu-more">F2</span>
+              </button>
+            ) : null}
             {node.parents.length > 0 ? (
               <button type="button" className="fl-menu-item fl-menu-danger" onClick={() => askDelete(node.id)}>
                 {t("menu.delete")}

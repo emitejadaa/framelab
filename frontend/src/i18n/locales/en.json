@@ -12,7 +12,10 @@
     "rows": "{{count}} rows",
     "drop_table": "Table",
     "drop_plot": "Plot",
-    "hint": "Right-click a node to operate · double-click opens its table · drag it to ▦ Table or ▟ Chart · Delete removes it"
+    "hint": "Right-click a node to operate · double-click opens its table · drag it to ▦ Table or ▟ Chart · Delete removes it",
+    "undo": "Undo",
+    "redo": "Redo",
+    "clear_failed": "Remove failed nodes"
   },
   "tabs": {
     "workbench": "Workbench",
@@ -24,8 +27,11 @@
       "computing": "computing…",
       "error": "error",
       "blocked": "blocked (parent failed)",
-      "ready": "ready"
-    }
+      "ready": "ready",
+      "cancelled": "cancelled",
+      "freed": "freed (recomputed when used)"
+    },
+    "cancelling": "cancelling…"
   },
   "menu": {
     "search": "Search operation…",
@@ -34,7 +40,10 @@
     "copy_code": "Copy code",
     "plot": "Plot",
     "delete": "Delete…",
-    "delete_short": "Delete"
+    "delete_short": "Delete",
+    "cancel": "Cancel",
+    "retry": "Retry",
+    "rename": "Rename…"
   },
   "inspector": {
     "empty": "Select a node",
@@ -51,7 +60,8 @@
     "origin": "From the start",
     "step": "This step",
     "copy": "Copy",
-    "copied": "Copied ✓"
+    "copied": "Copied ✓",
+    "export_title": "Whole session:"
   },
   "table": {
     "range": "{{from}}–{{to}} of {{total}}",
@@ -68,7 +78,8 @@
     "bad_number": "Type a number",
     "bad_bool": "Type true or false",
     "bad_date": "Type a date like 2024-01-31",
-    "bad_formula": "Check the formula"
+    "bad_formula": "Check the formula",
+    "force": "Apply anyway"
   },
   "ops": {
     "category": {
@@ -167,7 +178,12 @@
     "invalid_figure": "Invalid chart settings",
     "unknown_figure": "The figure no longer exists",
     "cannot_delete": "Cannot delete",
-    "invalid_formula": "Invalid formula"
+    "invalid_formula": "Invalid formula",
+    "too_big": "Result too big",
+    "string_aggregation": "Aggregation over text columns",
+    "name_taken": "That name already exists",
+    "cannot_rename": "Cannot rename",
+    "cannot_edit": "Cannot edit"
   },
   "plot": {
     "kind": {
@@ -369,5 +385,10 @@
       "where": "if… then… else…",
       "maximum": "the larger of two values"
     }
+  },
+  "rename": {
+    "title": "Rename {{name}}",
+    "help": "It is the variable name in the code; derived nodes with automatic names follow it.",
+    "confirm": "Rename"
   }
 }

@@ -30,6 +30,7 @@ export interface AppState {
   menu: MenuState | null;
   form: FormState | null;
   deleting: string | null;
+  renaming: string | null;
   setConnection(connection: ConnectionState, error?: string | null): void;
   setHello(hello: HelloResult): void;
   setSnapshot(snapshot: SessionSnapshot): void;
@@ -44,6 +45,7 @@ export interface AppState {
   openForm(form: FormState): void;
   closeForm(): void;
   askDelete(nodeId: string | null): void;
+  askRename(nodeId: string | null): void;
 }
 
 export type AppStore = ReturnType<typeof createAppStore>;
@@ -62,6 +64,7 @@ export function createAppStore() {
     menu: null,
     form: null,
     deleting: null,
+    renaming: null,
     setConnection: (connection, error = null) => set({ connection, error }),
     setHello: (hello) => set({ hello }),
     setSnapshot: (snapshot) =>
@@ -81,6 +84,7 @@ export function createAppStore() {
           view: gone ? { kind: "workbench" } : s.view,
           menu: s.menu && nodes.has(s.menu.nodeId) ? s.menu : null,
           form: s.form && nodes.has(s.form.nodeId) ? s.form : null,
+          renaming: s.renaming && nodes.has(s.renaming) ? s.renaming : null,
         };
       }),
     select: (selectedId) => set({ selectedId }),
@@ -113,5 +117,6 @@ export function createAppStore() {
     openForm: (form) => set({ form, menu: null }),
     closeForm: () => set({ form: null }),
     askDelete: (deleting) => set({ deleting, menu: null }),
+    askRename: (renaming) => set({ renaming, menu: null }),
   }));
 }
