@@ -185,6 +185,8 @@ DEFAULT_OPTIONS: tuple[Option, ...] = (
     Option("general.open_mode", "auto", str, ("auto", "inline", "window")),
     Option("general.inline_height", 720, int),
     Option("general.reduce_motion", False, bool),
+    Option("performance.guard_ram_fraction", 0.5, float),
+    Option("performance.cache_fraction", 0.25, float),
     Option("code.style", "steps", str, ("steps", "chained")),
     Option("code.filter_style", "mask", str, ("mask", "query")),
     Option("code.column_assign", "copy", str, ("copy", "assign")),

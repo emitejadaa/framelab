@@ -1941,6 +1941,7 @@ def test_string_aggregation_guard():
     s = Session([RootSpec("ventas", frame)])
     try:
         grouped = s.apply(call("n1", "groupby", by=ref_col("pais")))
+        s.wait(grouped.id)  # guards run before creating a node once the parents are ready
         with pytest.raises(GuardError) as info:
             s.apply(call(grouped.id, "sum"))
         assert info.value.code == "string_aggregation" and "nombre" in str(info.value)
@@ -2145,13 +2146,15 @@ def estimate(op: Op, values: Mapping[str, Any]) -> Estimate | None:
     if op.kind == "func":
         second = args[1] if len(args) > 1 else None
         if op.name == "merge":
-            return _merge(first or kw.get("left"), second or kw.get("right"), kw)
+            left = first if first is not None else kw.get("left")
+            return _merge(left, second if second is not None else kw.get("right"), kw)
         if op.name == "get_dummies":
             return _get_dummies(first if args else kw.get("data"), kw)
         if op.name == "pivot_table":
             return _pivot(first if args else kw.get("data"), kw)
         if op.name == "crosstab":
-            return _crosstab(first if args else kw.get("index"), second or kw.get("columns"))
+            columns = second if second is not None else kw.get("columns")
+            return _crosstab(first if args else kw.get("index"), columns)
     return None
 
 

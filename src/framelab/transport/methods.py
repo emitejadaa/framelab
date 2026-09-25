@@ -52,7 +52,11 @@ def register_session_methods(dispatcher: Dispatcher) -> None:
     session = dispatcher.session
 
     def apply(params: dict[str, Any], _buffers: list[bytes]) -> dict[str, Any]:
-        node = session.apply(op_from_json(params.get("op")), name=params.get("name"))
+        node = session.apply(
+            op_from_json(params.get("op")),
+            name=params.get("name"),
+            force=params.get("force") is True,
+        )
         return {"node": node.info()}
 
     def summary(params: dict[str, Any], _buffers: list[bytes]) -> dict[str, Any]:

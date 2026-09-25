@@ -13,10 +13,11 @@ from concurrent.futures import TimeoutError as FutureTimeout
 from typing import Any
 
 import pandas as pd
+import psutil
 
 from ..codegen.render import op_label, render_op
 from ..codegen.style import CodeStyle, restyle
-from ..engine import ComputeLane, run_statement
+from ..engine import ComputeLane, guards, run_statement
 from ..errors import FramelabError
 from ..naming import RootSpec, auto_node_name, op_alias, sanitize_identifier, unique_name
 from ..ops import Op, remap_op
@@ -54,8 +55,17 @@ class CannotEdit(FramelabError, ValueError):
 class Session:
     """Everything a framelab UI shows; also what ``fl.explore()`` returns."""
 
-    def __init__(self, roots: list[RootSpec], options: OptionsRegistry | None = None) -> None:
+    def __init__(
+        self,
+        roots: list[RootSpec],
+        options: OptionsRegistry | None = None,
+        *,
+        guard_bytes: int | None = None,
+        cache_bytes: int | None = None,
+    ) -> None:
         self.id = secrets.token_hex(8)
+        self._guard_bytes = guard_bytes
+        self._cache_bytes = cache_bytes
         self.rev = 0
         self._options = options if options is not None else default_registry
         self._lock = threading.RLock()
@@ -158,12 +168,18 @@ class Session:
     def apply(
         self, op: Op, *, name: str | None = None, node_id: str | None = None, force: bool = False
     ) -> Node:
-        """Create a node for ``op``; its result is computed on the compute lane."""
+        """Create a node for ``op``; its result is computed on the compute lane.
+
+        Guards refuse results that would not fit in memory (GuardError) unless ``force``.
+        """
         op.validate()
+        self._check_parents(op)
+        if not force and not self._replaying:
+            values = self._ready_values(op.parents())
+            if values is not None:
+                guards.check(op, values, limit_bytes=self._guard_limit())
         with self._lock:
-            for parent in op.parents():
-                if parent not in self._nodes:
-                    raise UnknownNode(f"no node with id {parent!r}")
+            self._check_parents(op)
             names = self.variable_names()
             if name is None:
                 trail = self._trail(op.target) if op.target else ()
@@ -196,12 +212,13 @@ class Session:
         return node
 
     def preview(self, op: Op, *, name: str | None = None) -> dict[str, str]:
-        """The code ``apply(op)`` would show, without creating the node."""
+        """The code ``apply(op)`` would show, without creating the node (guards included)."""
         op.validate()
+        self._check_parents(op)
+        values = self._ready_values(op.parents())
+        if values is not None:
+            guards.check(op, values, limit_bytes=self._guard_limit())
         with self._lock:
-            for parent in op.parents():
-                if parent not in self._nodes:
-                    raise UnknownNode(f"no node with id {parent!r}")
             names = self.variable_names()
             trail = self._trail(op.target) if op.target else ()
             final = (
@@ -276,6 +293,28 @@ class Session:
     def _after_rename(self, changes: list[tuple[str, str, bool, str, bool]]) -> None:
         if changes:
             self._record(Change("rename", names=changes))
+
+    def _check_parents(self, op: Op) -> None:
+        with self._lock:
+            for parent in op.parents():
+                if parent not in self._nodes:
+                    raise UnknownNode(f"no node with id {parent!r}")
+
+    def _guard_limit(self) -> int:
+        if self._guard_bytes is not None:
+            return self._guard_bytes
+        fraction = self._options.get("performance.guard_ram_fraction")
+        return int(psutil.virtual_memory().available * fraction)
+
+    def _ready_values(self, ids: tuple[str, ...]) -> dict[str, Any] | None:
+        """Parent values when every parent is ready (so guards can run before the node exists)."""
+        with self._lock:
+            out = {}
+            for nid in ids:
+                if self._nodes[nid].state is not NodeState.READY or nid not in self._results:
+                    return None
+                out[nid] = self._results[nid]
+            return out
 
     def edit_as_new(
         self, key: str, op: Op, *, replay: bool = True, name: str | None = None
@@ -478,7 +517,8 @@ class Session:
                 blocked_info = None
                 node.state = NodeState.COMPUTING
                 self.rev += 1
-                env = {self._nodes[p].name: self._results[p] for p in node.parents}
+                parent_values = {p: self._results[p] for p in node.parents}
+                env = {self._nodes[p].name: v for p, v in parent_values.items()}
                 rendered = render_op(node.op, node.name, self.variable_names())  # type: ignore[arg-type]
                 info = node.info()
         if blocked_info is not None:
@@ -486,6 +526,8 @@ class Session:
             raise NodeError(node)
         self._emit("node.state", info)
         try:
+            if not node.force:
+                guards.check(node.op, parent_values, limit_bytes=self._guard_limit())  # type: ignore[arg-type]
             value, warns = run_statement(rendered.executed, node.name, env)
         except Exception as exc:
             with self._lock:

@@ -61,6 +61,8 @@ def to_document(session: Session) -> dict[str, Any]:
             }
         else:
             entry["op"] = op_to_json(node.op)  # type: ignore[arg-type]
+            if node.force:
+                entry["force"] = True
         nodes.append(entry)
     return {
         "format": FORMAT,
@@ -132,6 +134,7 @@ def from_document(
             op_from_json(entry["op"]),
             name=None if entry.get("name_auto", True) else entry["name"],
             node_id=entry["id"],
+            force=entry.get("force", False) is True,
         )
         if entry.get("name_auto", True) and session.node(entry["id"]).name != entry["name"]:
             warnings.append(f"{entry['name']} was renamed to {session.node(entry['id']).name}")
