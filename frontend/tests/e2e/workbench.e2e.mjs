@@ -49,8 +49,20 @@ const rows = await page.locator(".fl-tableview .fl-table tbody tr").count();
 if (rows !== 3) await fail(`expected 3 rows, got ${rows}`);
 await page.screenshot({ path: `${shots}/table.png` });
 
+// sort by a header (view only), then filter rows by a cell: a new node
+await page.locator(".fl-tableview th", { hasText: "monto" }).click();
+await page.locator('[data-testid="sort-note"]').waitFor({ timeout: 5000 }).catch(() => fail("header click did not sort"));
+await page.locator(".fl-tableview tbody tr").first().locator("td").nth(1).click({ button: "right" });
+await page.locator('[data-testid="table-menu"] .fl-menu-item').first().click();
+await page.locator('[data-testid="created-note"]', { hasText: "ventas_head_filt" }).waitFor({ timeout: 8000 })
+  .catch(() => fail("filtering by a cell did not create ventas_head_filt"));
+const filtered = page.locator('[data-testid="node-card"]', { hasText: "ventas_head_filt" });
+
 // every pandas operation: browser -> nlargest(n=2, columns="monto") with a generated form
 await page.getByRole("button", { name: /← Workbench/ }).click();
+// the canvas centred the node made from the table; fit the view to reach the root again
+await page.locator(".react-flow__controls-fitview").click();
+await page.waitForTimeout(400);
 await root.click({ button: "right" });
 await page.locator('[data-testid="all-pandas"]').click();
 await page.locator('[data-testid="member-browser"] input').fill("nlargest");
@@ -68,6 +80,8 @@ await page.locator('[data-testid="node-card"]', { hasText: "ventas_nlargest" }).
 const nlargest = page.locator('[data-testid="node-card"]', { hasText: "ventas_nlargest" });
 await page.keyboard.press("Control+z");
 await nlargest.waitFor({ state: "detached", timeout: 5000 }).catch(() => fail("Ctrl+Z did not undo nlargest"));
+await page.keyboard.press("Control+z");
+await filtered.waitFor({ state: "detached", timeout: 5000 }).catch(() => fail("Ctrl+Z did not undo the cell filter"));
 await page.keyboard.press("Control+z");
 await created.waitFor({ state: "detached", timeout: 5000 }).catch(() => fail("Ctrl+Z did not undo the new node"));
 await page.keyboard.press("Control+y");

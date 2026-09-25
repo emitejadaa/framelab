@@ -58,15 +58,23 @@ export function useSummary(id: string | null, version: string): Loadable<Summary
   return state;
 }
 
-/** A decoded Arrow row window for a node. */
+export interface WindowSort {
+  column: number;
+  ascending: boolean;
+}
+
+/** A decoded Arrow row window for a node; ``sort`` orders it for viewing only. */
 export function useWindow(
   id: string | null,
   version: string,
   offset: number,
   limit: number,
+  sort: WindowSort | null = null,
 ): Loadable<DecodedWindow> {
   const rpc = useRpc();
   const [state, setState] = useState<Loadable<DecodedWindow>>({ data: null, error: null, loading: false });
+  const sortColumn = sort?.column;
+  const ascending = sort?.ascending ?? true;
   useEffect(() => {
     if (!id || version !== "ready") {
       setState({ data: null, error: null, loading: false });
@@ -75,7 +83,7 @@ export function useWindow(
     let alive = true;
     setState((s) => ({ ...s, loading: true }));
     rpc
-      .request<WindowMeta>("node.window", { id, offset, limit })
+      .request<WindowMeta>("node.window", sortColumn === undefined ? { id, offset, limit } : { id, offset, limit, sort: { column: sortColumn, ascending } })
       .then(({ result, buffers }) => {
         if (alive) setState({ data: decodeWindow(result, buffers[0]), error: null, loading: false });
       })
@@ -83,6 +91,6 @@ export function useWindow(
     return () => {
       alive = false;
     };
-  }, [id, version, offset, limit, rpc]);
+  }, [id, version, offset, limit, sortColumn, ascending, rpc]);
   return state;
 }

@@ -59,6 +59,7 @@ function CanvasInner() {
   const [nodes, setNodes] = useState<AnyNode[]>([]);
   const container = useRef<HTMLDivElement>(null);
   const flow = useReactFlow();
+  const touched = useRef<string | null>(null); // the node the user just clicked or dragged
   const infos = snapshot?.nodes ?? [];
   const figures = snapshot?.figures ?? [];
 
@@ -92,7 +93,7 @@ function CanvasInner() {
   // Keep the selected node in sight: new nodes appear far right as the graph grows, and the
   // minimap covers the bottom-right corner.
   useEffect(() => {
-    if (!selectedId) return;
+    if (!selectedId || touched.current === selectedId) return; // never move what is under the pointer
     const node = nodes.find((n) => n.id === selectedId);
     const box = container.current?.getBoundingClientRect();
     if (!node || !box) return;
@@ -183,6 +184,7 @@ function CanvasInner() {
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
         onNodeClick={(_e, node) => {
+          touched.current = node.id;
           if (isNodeCard(node)) select(node.id);
           closeMenu();
         }}
@@ -192,11 +194,13 @@ function CanvasInner() {
         }}
         onNodeContextMenu={(e, node) => {
           e.preventDefault();
+          touched.current = node.id;
           if (isNodeCard(node)) openMenu({ nodeId: node.id, x: e.clientX, y: e.clientY });
         }}
         onPaneClick={() => closeMenu()}
         onPaneContextMenu={(e) => e.preventDefault()}
         onNodeDragStart={(_e, node) => {
+          touched.current = node.id;
           dragStart.current = node.position;
         }}
         onNodeDrag={(e, node) => {

@@ -20,7 +20,7 @@ const fail = async (msg) => {
 const wait = (locator, what, timeout = 10000) => locator.waitFor({ timeout }).catch(() => fail(what));
 
 await page.goto(url);
-const root = page.locator('[data-testid="node-card"]', { hasText: "ventas" }).first();
+const root = page.locator('[data-testid="node-card"]').filter({ has: page.locator(".fl-card-name", { hasText: /^ventas$/ }) });
 await wait(root, "root node card never appeared", 15000);
 
 // ---- new column from a nested formula ----
@@ -37,7 +37,18 @@ const withTotal = page.locator('[data-testid="node-card"]', { hasText: "ventas_2
 await wait(withTotal, "formula node did not appear");
 
 // ---- drag the root to ▟ Gráfico ----
-const box = await root.boundingBox();
+// the canvas may still be panning to the node just created: wait until the card stops moving
+async function stableBox(locator) {
+  let previous = await locator.boundingBox();
+  for (let i = 0; i < 20; i++) {
+    await page.waitForTimeout(100);
+    const next = await locator.boundingBox();
+    if (next && previous && next.x === previous.x && next.y === previous.y) return next;
+    previous = next;
+  }
+  return previous;
+}
+const box = await stableBox(root);
 const target = await page.locator('[data-testid="drop-plot"]').boundingBox();
 await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
 await page.mouse.down();

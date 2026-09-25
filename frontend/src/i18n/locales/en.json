@@ -68,7 +68,21 @@
   "table": {
     "range": "{{from}}–{{to}} of {{total}}",
     "empty": "No rows",
-    "as_text": "text"
+    "as_text": "text",
+    "filter_eq": "Filter rows = {{value}}",
+    "filter_ne": "Filter rows ≠ {{value}}",
+    "copy_value": "Copy value",
+    "sort_asc": "Sort ▲ (view only)",
+    "sort_desc": "Sort ▼ (view only)",
+    "keep_missing": "Keep missing values",
+    "drop_missing": "Drop missing values",
+    "as_series": "Open as a Series",
+    "drop_column": "Drop the column",
+    "sorted_view": "View sorted by {{column}} {{dir}}",
+    "make_step": "Convert to a step",
+    "clear_sort": "Clear the sort",
+    "created": "{{name}} was created in the workbench",
+    "open_created": "Open its table"
   },
   "form": {
     "apply": "Apply",

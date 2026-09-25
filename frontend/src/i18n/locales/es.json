@@ -68,7 +68,21 @@
   "table": {
     "range": "{{from}}–{{to}} de {{total}}",
     "empty": "Sin filas",
-    "as_text": "texto"
+    "as_text": "texto",
+    "filter_eq": "Filtrar filas = {{value}}",
+    "filter_ne": "Filtrar filas ≠ {{value}}",
+    "copy_value": "Copiar valor",
+    "sort_asc": "Ordenar ▲ (solo la vista)",
+    "sort_desc": "Ordenar ▼ (solo la vista)",
+    "keep_missing": "Quedarse con los vacíos",
+    "drop_missing": "Quitar los vacíos",
+    "as_series": "Abrir como Series",
+    "drop_column": "Quitar la columna",
+    "sorted_view": "Vista ordenada por {{column}} {{dir}}",
+    "make_step": "Convertir en paso",
+    "clear_sort": "Quitar el orden",
+    "created": "Se creó {{name}} en el workbench",
+    "open_created": "Abrir su tabla"
   },
   "form": {
     "apply": "Aplicar",
