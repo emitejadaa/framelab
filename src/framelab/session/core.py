@@ -17,7 +17,7 @@ from ..codegen.render import op_label, render_op
 from ..codegen.style import CodeStyle, restyle
 from ..engine import ComputeLane, run_statement
 from ..errors import FramelabError
-from ..naming import RootSpec, auto_node_name, sanitize_identifier
+from ..naming import RootSpec, auto_node_name, op_alias, sanitize_identifier
 from ..ops import Op
 from ..options import OptionsRegistry
 from ..options import registry as default_registry
@@ -25,7 +25,7 @@ from ..protocol.schema import SessionSnapshot
 from .figures import FigureStore
 from .node import ErrorDetail, Node, NodeError, NodeState, NotReady, UnknownNode, classify
 
-__all__ = ["CannotDelete", "Session"]
+__all__ = ["CannotDelete", "CannotRename", "NameTaken", "Session"]
 
 log = logging.getLogger("framelab")
 
@@ -35,6 +35,14 @@ _DEAD = (NodeState.ERROR, NodeState.BLOCKED)
 
 class CannotDelete(FramelabError, ValueError):
     code = "cannot_delete"
+
+
+class CannotRename(FramelabError, ValueError):
+    code = "cannot_rename"
+
+
+class NameTaken(FramelabError, ValueError):
+    code = "name_taken"
 
 
 class Session:
@@ -67,6 +75,7 @@ class Session:
             node = Node(
                 id=self._take_id(None),
                 name=spec.name,
+                alias=spec.name,
                 op=None,
                 name_auto=False,
                 source_expr=spec.source_expr,
@@ -146,7 +155,8 @@ class Session:
                     raise UnknownNode(f"no node with id {parent!r}")
             names = self.variable_names()
             if name is None:
-                final, auto = auto_node_name(op, names, self._by_name), True
+                trail = self._trail(op.target) if op.target else ()
+                final, auto = auto_node_name(op, names, self._by_name, trail), True
             else:
                 final, auto = sanitize_identifier(name), False
                 if final in self._by_name:
@@ -158,6 +168,7 @@ class Session:
                 parents=op.parents(),
                 name_auto=auto,
                 label=op_label(op, names),
+                alias=op_alias(op, names),
             )
             self._register(node)
             if any(self._nodes[p].state in _DEAD for p in node.parents):
@@ -179,13 +190,78 @@ class Session:
                 if parent not in self._nodes:
                     raise UnknownNode(f"no node with id {parent!r}")
             names = self.variable_names()
-            final = sanitize_identifier(name) if name else auto_node_name(op, names, self._by_name)
+            trail = self._trail(op.target) if op.target else ()
+            final = (
+                sanitize_identifier(name)
+                if name
+                else auto_node_name(op, names, self._by_name, trail)
+            )
         style = self.code_style()
         return {
             "name": final,
             "code": restyle(render_op(op, final, names, style).display, style),
             "label": op_label(op, names),
         }
+
+    def _trail(self, nid: str) -> tuple[str, ...]:
+        """(root name, alias, alias, …) along the first-parent chain of ``nid``."""
+        parts: list[str] = []
+        node = self._nodes[nid]
+        while not node.is_root:
+            if node.alias:
+                parts.append(node.alias)
+            node = self._nodes[node.parents[0]]
+        return (node.name, *reversed(parts))
+
+    def _set_name(self, node: Node, name: str, auto: bool) -> None:
+        if self._by_name.get(node.name) == node.id:
+            del self._by_name[node.name]
+        node.name, node.name_auto = name, auto
+        self._by_name[name] = node.id
+
+    def rename(self, key: str, new_name: str) -> list[str]:
+        """Rename a node; auto-named descendants follow. Returns the ids whose name changed."""
+        with self._lock:
+            nid = self._resolve(key)
+            node = self._nodes[nid]
+            if node.is_root:
+                raise CannotRename(f"{node.name} is your own variable: rename it in your code")
+            final = sanitize_identifier(new_name)
+            taken = (set(self._by_name) | self.plots.names()) - {node.name}
+            if final in taken:
+                raise NameTaken(f"{final!r} is already used")
+            changes: list[tuple[str, str, bool, str, bool]] = []
+            if final != node.name or node.name_auto:
+                changes.append((nid, node.name, node.name_auto, final, False))
+                self._set_name(node, final, False)
+            touched = {nid}
+            for d in self.descendants(nid)[1:]:
+                child = self._nodes[d]
+                names = self.variable_names()
+                label = op_label(child.op, names)  # type: ignore[arg-type]
+                if label != child.label:
+                    child.label = label
+                    touched.add(d)
+                if child.name_auto:
+                    others = (set(self._by_name) | self.plots.names()) - {child.name}
+                    target = child.op.target  # type: ignore[union-attr]
+                    trail = self._trail(target) if target else ()
+                    fresh = auto_node_name(child.op, names, others, trail)
+                    if fresh != child.name:
+                        changes.append((d, child.name, True, fresh, True))
+                        self._set_name(child, fresh, True)
+                        touched.add(d)
+                    child.alias = op_alias(child.op, names)
+            if changes or len(touched) > 1:
+                self.rev += 1
+            self._after_rename(changes)
+            infos = [n.info() for i, n in self._nodes.items() if i in touched]
+        for info in infos:
+            self._emit("node.upserted", info)
+        return [c[0] for c in changes]
+
+    def _after_rename(self, changes: list[tuple[str, str, bool, str, bool]]) -> None:
+        """Hook for the workbench history."""
 
     def descendants(self, key: str) -> list[str]:
         """The node and everything computed from it, in creation order."""

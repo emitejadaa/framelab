@@ -18,6 +18,7 @@ __all__ = [
     "MAX_NAME",
     "OP_ALIASES",
     "auto_node_name",
+    "op_alias",
     "RESERVED_NAMES",
     "RootSpec",
     "resolve_root_names",
@@ -227,8 +228,30 @@ def _first_label(value: Any) -> Any:
     return getattr(value, "label", getattr(value, "value", value))
 
 
-def auto_node_name(op: Any, names: Mapping[str, str], taken: Iterable[str]) -> str:
-    """Name for a new node: ``{parent}_{alias}``, short, unique and a valid identifier."""
+def op_alias(op: Any, names: Mapping[str, str]) -> str:
+    """The short word an op adds to a name (``""`` for setitem: it keeps its parent's name)."""
+    if op.kind == "setitem":
+        return ""
+    if op.kind == "getitem":
+        return "cols" if isinstance(op.key, list) else _slug(label_text(op.key))
+    if op.kind == "filter":
+        return "filt"
+    if op.kind == "call" and op.name == "groupby" and op.kwargs:
+        by = dict(op.kwargs).get("by")
+        return "by_" + _slug(label_text(_first_label(by))) if by is not None else "grouped"
+    if op.kind == "call" and op.name == "merge" and op.args and hasattr(op.args[0], "id"):
+        return names[op.args[0].id]
+    return OP_ALIASES.get(op.name, op.name)
+
+
+def auto_node_name(
+    op: Any, names: Mapping[str, str], taken: Iterable[str], trail: Sequence[str] = ()
+) -> str:
+    """``{parent}_{alias}``, short, unique and a valid identifier.
+
+    Past MAX_NAME the name keeps the root and the last steps: ``trail`` is the parent's
+    ``(root, alias, alias, …)``; without it the root is the parent name's first word.
+    """
     taken = set(taken)
     if op.target is not None:
         parent = names[op.target]
@@ -237,19 +260,14 @@ def auto_node_name(op: Any, names: Mapping[str, str], taken: Iterable[str]) -> s
         parent = names[refs[0]] if refs else DEFAULT_ROOT_NAME
     if op.kind == "setitem":
         return unique_name(parent, taken)
-    if op.kind == "getitem":
-        alias = "cols" if isinstance(op.key, list) else _slug(label_text(op.key))
-    elif op.kind == "filter":
-        alias = "filt"
-    elif op.kind == "call" and op.name == "groupby" and op.kwargs:
-        by = dict(op.kwargs).get("by")
-        alias = "by_" + _slug(label_text(_first_label(by))) if by is not None else "grouped"
-    elif op.kind == "call" and op.name == "merge" and op.args and hasattr(op.args[0], "id"):
-        alias = names[op.args[0].id]
-    else:
-        alias = OP_ALIASES.get(op.name, op.name)
+    alias = op_alias(op, names)
     base = f"{parent}_{alias}"
     if len(base) > MAX_NAME:
-        root = parent.split("_")[0]
-        base = f"{root}_{alias}"[:MAX_NAME].rstrip("_")
+        root = trail[0] if trail else parent.split("_")[0]
+        recent = [a for a in trail[1:] if a][-1:]
+        for candidate in ("_".join([root, *recent, alias]), f"{root}_{alias}"):
+            base = candidate
+            if len(base) <= MAX_NAME:
+                break
+        base = base[:MAX_NAME].rstrip("_")
     return unique_name(sanitize_identifier(base), taken)

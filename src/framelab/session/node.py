@@ -62,6 +62,7 @@ class Node:
     shape: tuple[int, ...] | None = None
     error: ErrorDetail | None = None
     warnings: tuple[str, ...] = ()
+    alias: str = ""  # the word this node's op adds to automatic names
 
     @property
     def is_root(self) -> bool:

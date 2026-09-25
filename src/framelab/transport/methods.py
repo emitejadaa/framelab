@@ -155,6 +155,14 @@ def register_session_methods(dispatcher: Dispatcher) -> None:
     dispatcher.register("figure.code", figure_code)
     dispatcher.register("figure.render", figure_render)
     dispatcher.register("figure.export", figure_export)
+
+    def rename(params: dict[str, Any], _buffers: list[bytes]) -> dict[str, Any]:
+        name = params.get("name")
+        if not isinstance(name, str) or not name.strip():
+            raise BadRequest("name must be a non-empty string")
+        return {"renamed": session.rename(_id(params), name)}
+
+    dispatcher.register("node.rename", rename)
     dispatcher.register("node.delete_preview", delete_preview)
     dispatcher.register("node.delete", delete)
     dispatcher.register("formula.parse", formula)

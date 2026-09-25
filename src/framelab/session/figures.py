@@ -96,6 +96,10 @@ class FigureStore:
         with self._lock:
             return [d.info() for d in self._docs.values()]
 
+    def names(self) -> set[str]:
+        with self._lock:
+            return {d.spec["name"] for d in self._docs.values()}
+
     def ids(self) -> list[str]:
         with self._lock:
             return list(self._docs)

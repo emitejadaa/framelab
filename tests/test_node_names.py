@@ -41,7 +41,15 @@ def test_auto_names(op, name):
     assert auto_node_name(op, NAMES, taken) == name
 
 
-def test_long_chains_restart_from_the_root():
-    names = {"n9": "ventas_filt_sorted_dedup_reset"}
-    got = auto_node_name(call("n9", "head", n=5), names, set(names.values()))
-    assert got == "ventas_head" and len(got) <= 30
+def test_long_names_keep_the_root_and_the_last_steps():
+    names = {"n9": "ventas_filt_2_by_pais_total"}
+    trail = ("ventas", "filt", "by_pais", "total")
+    got = auto_node_name(call("n9", "sum"), names, set(names.values()), trail)
+    assert got == "ventas_total_sum"
+
+
+def test_very_long_aliases_fall_back_to_root_and_alias():
+    names = {"n9": "ventas_" + "x" * 25}
+    trail = ("ventas", "x" * 25)
+    got = auto_node_name(call("n9", "drop_duplicates"), names, set(names.values()), trail)
+    assert got == "ventas_dedup" and len(got) <= 30
