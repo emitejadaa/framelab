@@ -163,6 +163,11 @@ def register_session_methods(dispatcher: Dispatcher) -> None:
         return {"renamed": session.rename(_id(params), name)}
 
     dispatcher.register("node.rename", rename)
+    dispatcher.register(
+        "node.cancel", lambda params, _b: {"cancelled": session.cancel(_id(params))}
+    )
+    dispatcher.register("node.retry", lambda params, _b: {"ids": session.retry(_id(params))})
+    dispatcher.register("graph.clear_failed", lambda params, _b: session.clear_failed())
     dispatcher.register("graph.undo", lambda params, _b: {"done": session.undo()})
     dispatcher.register("graph.redo", lambda params, _b: {"done": session.redo()})
     dispatcher.register("node.delete_preview", delete_preview)

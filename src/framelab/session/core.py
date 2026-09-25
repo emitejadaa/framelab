@@ -8,7 +8,7 @@ import secrets
 import threading
 import traceback
 from collections.abc import Callable, Iterator
-from concurrent.futures import Future
+from concurrent.futures import CancelledError, Future
 from concurrent.futures import TimeoutError as FutureTimeout
 from typing import Any
 
@@ -32,7 +32,7 @@ __all__ = ["CannotDelete", "CannotRename", "NameTaken", "Session"]
 log = logging.getLogger("framelab")
 
 Listener = Callable[[str, dict[str, Any]], None]
-_DEAD = (NodeState.ERROR, NodeState.BLOCKED)
+_DEAD = (NodeState.ERROR, NodeState.BLOCKED, NodeState.CANCELLED)
 
 
 class CannotDelete(FramelabError, ValueError):
@@ -441,7 +441,12 @@ class Session:
             node = self._nodes.get(nid)
             if node is None:  # deleted while it was queued
                 raise UnknownNode(f"node {nid!r} was deleted")
-            if any(self._nodes[p].state in _DEAD for p in node.parents):
+            if node.cancel_requested:  # cancelled just before it started
+                node.cancel_requested = False
+                node.state = NodeState.CANCELLED
+                self.rev += 1
+                blocked_info = node.info()
+            elif any(self._nodes[p].state in _DEAD for p in node.parents):
                 node.state = NodeState.BLOCKED
                 self.rev += 1
                 blocked_info = node.info()
@@ -469,6 +474,18 @@ class Session:
         with self._lock:
             if self._nodes.get(nid) is not node:  # deleted while computing
                 return value
+            if node.cancel_requested:  # cancelled while computing: discard the result
+                node.cancel_requested = False
+                node.state = NodeState.CANCELLED
+                self.rev += 1
+                info = node.info()
+                cancelled = True
+            else:
+                cancelled = False
+        if cancelled:
+            self._emit("node.state", info)
+            raise NodeError(node)
+        with self._lock:
             self._results[nid] = value
             node.kind, node.shape = classify(value)
             node.warnings = tuple(warns)
@@ -481,11 +498,52 @@ class Session:
     def wait(self, key: str, timeout: float | None = None) -> Any:
         """The node's value, waiting for its computation (raises NodeError on failure)."""
         with self._lock:
-            future = self._futures[self._resolve(key)]
+            nid = self._resolve(key)
+            future = self._futures[nid]
         try:
             return future.result(timeout)
         except FutureTimeout:
             raise NotReady(f"{key} is still computing") from None
+        except CancelledError:
+            raise NodeError(self._nodes[nid]) from None
+
+    def cancel(self, key: str) -> bool:
+        """Stop a node: queued ones never run; running ones finish and are discarded."""
+        with self._lock:
+            node = self._nodes[self._resolve(key)]
+            if node.state not in (NodeState.PENDING, NodeState.COMPUTING):
+                return False
+            future = self._futures.get(node.id)
+            if node.state is NodeState.PENDING and future is not None and future.cancel():
+                node.state = NodeState.CANCELLED
+            else:
+                node.cancel_requested = True
+            self.rev += 1
+            info = node.info()
+        self._emit("node.state", info)
+        return True
+
+    def retry(self, key: str) -> list[str]:
+        """Run again the node and its failed, blocked or cancelled descendants."""
+        with self._lock:
+            again = [d for d in self.descendants(key) if self._nodes[d].state in _DEAD]
+            for d in again:
+                node = self._nodes[d]
+                node.state = NodeState.PENDING
+                node.error, node.warnings, node.cancel_requested = None, (), False
+                self._futures[d] = self._lane.submit(self._compute, d)
+            if again:
+                self.rev += 1
+            infos = [self._nodes[d].info() for d in again]
+        for info in infos:
+            self._emit("node.state", info)
+        return again
+
+    def clear_failed(self) -> dict[str, Any]:
+        """Delete every node in error, blocked or cancelled (one undo step)."""
+        with self._lock:
+            failed = [i for i, n in self._nodes.items() if not n.is_root and n.state in _DEAD]
+        return self.delete(*failed) if failed else {"ids": [], "figures": []}
 
     def __getitem__(self, key: str) -> Any:
         return self.wait(key)

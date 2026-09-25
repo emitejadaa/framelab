@@ -48,7 +48,7 @@ class OptionDescription(TypedDict):
 
 
 NodeKindName = Literal["Unknown", "DataFrame", "Series", "GroupBy", "Index", "Value"]
-NodeStateName = Literal["pending", "computing", "ready", "error", "blocked"]
+NodeStateName = Literal["pending", "computing", "ready", "error", "blocked", "cancelled", "freed"]
 
 
 class NodeErrorInfo(TypedDict):
@@ -67,6 +67,7 @@ class NodeInfo(TypedDict):
     shape: NotRequired[list[int]]
     error: NotRequired[NodeErrorInfo]
     warnings: NotRequired[list[str]]
+    cancelling: NotRequired[bool]
 
 
 class FigureInfo(TypedDict):

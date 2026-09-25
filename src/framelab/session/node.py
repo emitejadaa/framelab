@@ -30,6 +30,8 @@ class NodeState(StrEnum):
     READY = "ready"
     ERROR = "error"
     BLOCKED = "blocked"
+    CANCELLED = "cancelled"
+    FREED = "freed"  # result released from memory; recomputed when used
 
 
 class NodeKind(StrEnum):
@@ -64,6 +66,7 @@ class Node:
     warnings: tuple[str, ...] = ()
     alias: str = ""  # the word this node's op adds to automatic names
     force: bool = False  # created with the guards skipped
+    cancel_requested: bool = False
 
     @property
     def is_root(self) -> bool:
@@ -85,6 +88,8 @@ class Node:
             out["error"] = {"type": self.error.type, "message": self.error.message}
         if self.warnings:
             out["warnings"] = list(self.warnings)
+        if self.cancel_requested and self.state in (NodeState.PENDING, NodeState.COMPUTING):
+            out["cancelling"] = True
         return out
 
 
@@ -109,6 +114,8 @@ class NodeError(FramelabError):
         self.node = node
         if node.error is not None:
             detail = f"{node.error.type}: {node.error.message}"
+        elif node.state is NodeState.CANCELLED:
+            detail = "was cancelled"
         else:
             detail = f"is {node.state.value} because an ancestor failed"
         super().__init__(
