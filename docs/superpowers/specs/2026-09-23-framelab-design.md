@@ -416,6 +416,14 @@ cierra con verificación + borrado de tests de andamio + resumen breve al usuari
 - **M1b — Núcleo completo.** Estilos de codegen restantes, caché/desalojo, generador de catálogo completo
   (retorno/mutación/preview_policy, funciones pd, overrides), nombres automáticos, deshacer por contexto,
   guardas, nodos de error/bloqueado/cancelado, reproducir rama, export .py/.ipynb, autosave.
+  **Entregado (2026-09-25):** estilos de código (comillas, alias de imports, `query` con respaldo en
+  máscara, `assign`, encadenado) probados por fidelidad; nombres raíz + últimos pasos y renombrar con
+  seguimiento de los auto-nombrados; historial (crear/borrar/renombrar/editar como nuevo) con
+  deshacer/rehacer; cancelar/reintentar/limpiar errores; guardas (tamaño exacto de merge, estimaciones de
+  reshaping, agregaciones sobre texto) con "aplicar de todos modos"; caché con nodos liberados, pins y
+  recálculo; catálogo generado (`catalog/pandas.json.gz`, `tools/gen_catalog.py`); export `.py`/`.ipynb`;
+  autosave + `fl.open`/`fl.autosaves`. Pendiente: UI de preferencias de código (M7), formularios desde el
+  catálogo (M2b/M4).
 - **M2b — Workbench completo.** Menús por categorías + A–Z + atributos, formularios auto-generados con código
   en vivo, paleta, filtro y selección, combinar por arrastre + diálogo merge/join/concat con estimación,
   editar como nuevo, eliminar con lápidas, colapsar, minimapa, íconos de copiar en valores, tooltips, estados
