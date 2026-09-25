@@ -757,8 +757,8 @@ def _statement(name: str, chain: Chain) -> str:
     if len(flat) <= MAX_LINE or sum(kind == "dot" for kind, _ in steps) <= 1:
         return flat
     rows = [head]
-    for kind, text in steps:
-        if kind == "sub":
+    for i, (kind, text) in enumerate(steps):
+        if kind == "sub" or i == 0:  # the first step stays on the head's line
             rows[-1] += text
         else:
             rows.append(text)
