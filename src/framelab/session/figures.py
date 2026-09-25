@@ -20,6 +20,7 @@ from ..plot.kinds import KINDS, catalog
 from ..plot.render import PREVIEW_ROWS, build, png_bytes, style_context
 from ..plot.spec import FigureSpecError, normalize
 from .node import NodeError, NotReady, UnknownNode
+from .paths import output_path
 
 if TYPE_CHECKING:
     from matplotlib.figure import Figure
@@ -255,7 +256,8 @@ class FigureStore:
         return code.blocks[0].executed[1].split(" = ", 1)[0]
 
     # ---- output ---------------------------------------------------------------------------------
-    def code(self, fid: str, mode: str = "full", timeout: float = 30.0) -> str:
+    def figure_display(self, fid: str, timeout: float = 30.0) -> str:
+        """The figure's own code (unstyled), with its savefig line when it was exported."""
         with self._lock:
             doc = self._doc(fid)
             exported = doc.exported
@@ -266,8 +268,13 @@ class FigureStore:
             if exported.get("transparent"):
                 args.append("transparent=True")
             savefig = f"{code.fig_var}.savefig({', '.join(args)})"
+        return code.display(savefig=savefig)
+
+    def code(self, fid: str, mode: str = "full", timeout: float = 30.0) -> str:
+        with self._lock:
+            doc = self._doc(fid)
         style = self._session.code_style()
-        figure = code.display(savefig=savefig)
+        figure = self.figure_display(fid, timeout)
         if mode == "figure":
             return restyle(figure, style)
         sources = []
@@ -349,16 +356,7 @@ class FigureStore:
             raise BadRequest("dpi must be an integer between 30 and 1200")
         target: Path | None = None
         if path is not None:
-            if not isinstance(path, str) or not path.strip():
-                raise BadRequest("path must be a file name")
-            target = Path(path).expanduser()
-            if not target.is_absolute():
-                target = Path.cwd() / target
-            suffixes = {"jpg": (".jpg", ".jpeg")}.get(fmt, (f".{fmt}",))
-            if target.suffix.lower() not in suffixes:
-                raise BadRequest(f"the file name must end in {suffixes[0]}")
-            if target.is_dir() or not target.parent.is_dir():
-                raise BadRequest(f"cannot write {target}: the folder does not exist")
+            target = output_path(path, {"jpg": (".jpg", ".jpeg")}.get(fmt, (f".{fmt}",)))
         buffer = io.BytesIO()
         with style_context(doc.spec["style"]):
             _, out = self._build(doc, timeout, None)

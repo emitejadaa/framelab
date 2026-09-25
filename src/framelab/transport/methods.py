@@ -192,6 +192,10 @@ def register_session_methods(dispatcher: Dispatcher) -> None:
         return {"pandas_version": catalog.pandas_version, "members": members}
 
     dispatcher.register("catalog.members", catalog_members)
+    dispatcher.register(
+        "session.export",
+        lambda params, _b: session.export(params.get("format", "py"), path=params.get("path")),
+    )
     dispatcher.register("session.pins", pins)
     dispatcher.register("node.rename", rename)
     dispatcher.register("node.edit_as_new", edit_as_new)

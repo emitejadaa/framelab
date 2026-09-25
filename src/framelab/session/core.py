@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import json
 import logging
 import secrets
 import threading
@@ -19,7 +20,7 @@ from ..codegen.render import op_label, render_op
 from ..codegen.style import CodeStyle, restyle
 from ..engine import ComputeLane, guards, run_statement
 from ..engine.cache import ResultCache, buffers, default_budget, value_bytes
-from ..errors import FramelabError
+from ..errors import BadRequest, FramelabError
 from ..naming import RootSpec, auto_node_name, op_alias, sanitize_identifier, unique_name
 from ..ops import Op, remap_op
 from ..options import OptionsRegistry
@@ -711,6 +712,24 @@ class Session:
         from ..codegen.script import node_script
 
         return node_script(self, key, mode=mode, style=style)
+
+    def export(self, fmt: str = "py", path: str | None = None) -> dict[str, Any]:
+        """The whole session as a script (``py``) or notebook (``ipynb``); written if ``path``."""
+        from ..codegen.export import session_notebook, session_script
+        from .paths import output_path
+
+        if fmt == "py":
+            text = session_script(self)
+        elif fmt == "ipynb":
+            text = json.dumps(session_notebook(self), ensure_ascii=False, indent=1) + "\n"
+        else:
+            raise BadRequest("format must be py or ipynb")
+        written = None
+        if path is not None:
+            target = output_path(path, (f".{fmt}",))
+            target.write_text(text, encoding="utf-8")
+            written = str(target)
+        return {"text": text, "path": written}
 
     def window(
         self,

@@ -3802,7 +3802,12 @@ def test_exported_script_reproduces_every_node(tmp_path, options):
     s = build(options)
     try:
         values = run_script(s.export("py")["text"], tmp_path)
-        ready = [n for n in s.nodes() if n.state.value == "ready" and not n.is_root]
+        tables = ("DataFrame", "Series")  # what the script run pickles back
+        ready = [
+            n
+            for n in s.nodes()
+            if n.state.value == "ready" and not n.is_root and n.kind.value in tables
+        ]
         if not options:
             assert {n.name for n in ready} <= set(values)
         assert "por_pais" in values

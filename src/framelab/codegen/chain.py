@@ -74,7 +74,9 @@ def _statement(name: str, chain: Chain) -> str:
     return f"{name} = (\n{body}\n)"
 
 
-def chained_lines(session: Any, targets: list[str], style: CodeStyle) -> list[str]:
+def chained_lines(
+    session: Any, targets: list[str], style: CodeStyle, root_mode: str = "origin"
+) -> list[str]:
     """Statements (unstyled) that create every node in ``targets``, chaining where possible."""
     names = session.variable_names()
     wanted: set[str] = set()
@@ -105,7 +107,7 @@ def chained_lines(session: Any, targets: list[str], style: CodeStyle) -> list[st
         node = session.node(nid)
         op = ops[nid]
         if op is None:
-            line = root_line(node, "origin")
+            line = root_line(node, root_mode)
             if line:
                 lines.append(line)
             chains[nid] = (node.name, [])
