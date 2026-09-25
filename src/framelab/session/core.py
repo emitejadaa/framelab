@@ -79,6 +79,7 @@ class Session:
         self._lane = ComputeLane()
         self._encoders: dict[str, Any] = {}
         self.widget: Any = None
+        self.autosaver: Any = None
         self.plots = FigureStore(self)
         self._history = History()
         self._replaying = 0
@@ -801,6 +802,8 @@ class Session:
         return out
 
     def close(self) -> None:
+        if self.autosaver is not None:
+            self.autosaver.close()
         self._lane.shutdown(wait=False)
 
     def __repr__(self) -> str:
