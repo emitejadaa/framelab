@@ -18,8 +18,10 @@ from ..ops.values import (
     GetCol,
     ListV,
     Lit,
+    NegE,
     NodeRef,
     NotE,
+    NpCall,
     OpError,
     This,
     Value,
@@ -30,7 +32,10 @@ __all__ = ["Rendered", "op_label", "render_expr", "render_op", "render_value"]
 
 MAX_LABEL = 48
 # ~x binds tighter than comparisons, arithmetic, & and |, so NotE never needs parentheses.
-_ATOMS = (This, GetCol, CallE, AttrE, NodeRef, Lit, Col, Func, ListV, DictV, NotE)
+_ATOMS = (This, GetCol, CallE, AttrE, NodeRef, Lit, Col, Func, ListV, DictV, NotE, NpCall)
+# Python precedence of arithmetic; unary minus sits between * and **.
+_PREC = {"+": 1, "-": 1, "*": 2, "/": 2, "//": 2, "%": 2, "**": 4}
+_NEG = 3
 
 
 @dataclass(frozen=True)
@@ -52,6 +57,41 @@ def _arglist(args, kwargs, names: Mapping[str, str], this: str) -> str:
 def _operand(v: Value, names: Mapping[str, str], this: str) -> str:
     text = render_value(v, names, this)
     return text if isinstance(v, _ATOMS) else f"({text})"
+
+
+def _base(v: Value, names: Mapping[str, str], this: str) -> str:
+    """The object a method, attribute or subscript applies to: ``(a / b).round(2)``."""
+    text = render_value(v, names, this)
+    atom = isinstance(v, _ATOMS) and not isinstance(v, (NotE, Lit))
+    return text if atom else f"({text})"
+
+
+def _arith_prec(v: Value) -> int | None:
+    if isinstance(v, Arith):
+        return _PREC[v.op]
+    if isinstance(v, NegE):
+        return _NEG
+    number = (
+        isinstance(v, Lit) and isinstance(v.value, (int, float)) and not isinstance(v.value, bool)
+    )
+    if number and v.value < 0:  # type: ignore[union-attr]
+        return _NEG  # "-3" reads like a unary minus
+    return None
+
+
+def _arith_operand(v: Value, parent: str, side: str, names: Mapping[str, str], this: str) -> str:
+    """Parentheses only where Python needs them; ties on the right keep the evaluation order."""
+    prec = _arith_prec(v)
+    if prec is None:
+        return _operand(v, names, this)
+    text = render_value(v, names, this)
+    if parent == "**":
+        need = side == "left" or prec < _NEG
+    elif side == "left":
+        need = prec < _PREC[parent]
+    else:
+        need = prec <= _PREC[parent] or prec == _NEG
+    return f"({text})" if need else text
 
 
 def render_value(v: Value, names: Mapping[str, str], this: str) -> str:
@@ -77,14 +117,26 @@ def render_expr(e: Value, names: Mapping[str, str], this: str) -> str:
     if isinstance(e, This):
         return this
     if isinstance(e, GetCol):
-        return f"{render_expr(e.base, names, this)}[{emit_literal(e.label)}]"
+        return f"{_base(e.base, names, this)}[{emit_literal(e.label)}]"
     if isinstance(e, CallE):
-        base = render_expr(e.base, names, this)
+        base = _base(e.base, names, this)
         return f"{base}{_accessor(e.accessor)}.{e.name}({_arglist(e.args, e.kwargs, names, this)})"
     if isinstance(e, AttrE):
-        return f"{render_expr(e.base, names, this)}{_accessor(e.accessor)}.{e.name}"
-    if isinstance(e, (Cmp, Arith)):
+        return f"{_base(e.base, names, this)}{_accessor(e.accessor)}.{e.name}"
+    if isinstance(e, Arith):
+        left = _arith_operand(e.left, e.op, "left", names, this)
+        return f"{left} {e.op} {_arith_operand(e.right, e.op, 'right', names, this)}"
+    if isinstance(e, Cmp):
         return f"{_operand(e.left, names, this)} {e.op} {_operand(e.right, names, this)}"
+    if isinstance(e, NegE):
+        inner = render_value(e.item, names, this)
+        return (
+            f"-{inner}"
+            if _arith_prec(e.item) is None and isinstance(e.item, _ATOMS)
+            else f"-({inner})"
+        )
+    if isinstance(e, NpCall):
+        return f"np.{e.name}({', '.join(render_value(a, names, this) for a in e.args)})"
     if isinstance(e, BoolE):
         sep = " & " if e.op == "and" else " | "
         return sep.join(_operand(i, names, this) for i in e.items)

@@ -15,19 +15,25 @@ import pandas as pd
 
 from ..codegen.render import op_label, render_op
 from ..engine import ComputeLane, run_statement
+from ..errors import FramelabError
 from ..naming import RootSpec, auto_node_name, sanitize_identifier
 from ..ops import Op
 from ..options import OptionsRegistry
 from ..options import registry as default_registry
 from ..protocol.schema import SessionSnapshot
+from .figures import FigureStore
 from .node import ErrorDetail, Node, NodeError, NodeState, NotReady, UnknownNode, classify
 
-__all__ = ["Session"]
+__all__ = ["CannotDelete", "Session"]
 
 log = logging.getLogger("framelab")
 
 Listener = Callable[[str, dict[str, Any]], None]
 _DEAD = (NodeState.ERROR, NodeState.BLOCKED)
+
+
+class CannotDelete(FramelabError, ValueError):
+    code = "cannot_delete"
 
 
 class Session:
@@ -47,6 +53,7 @@ class Session:
         self._lane = ComputeLane()
         self._encoders: dict[str, Any] = {}
         self.widget: Any = None
+        self.plots = FigureStore(self)
         for spec in roots:
             if not isinstance(spec.obj, (pd.DataFrame, pd.Series)):
                 raise TypeError(
@@ -120,6 +127,10 @@ class Session:
     def source_expr(self, key: str) -> str | None:
         return self.node(key).source_expr
 
+    def node_ids(self) -> list[str]:
+        with self._lock:
+            return list(self._nodes)
+
     def variable_names(self) -> dict[str, str]:
         with self._lock:
             return {nid: n.name for nid, n in self._nodes.items()}
@@ -174,9 +185,51 @@ class Session:
             "label": op_label(op, names),
         }
 
+    def descendants(self, key: str) -> list[str]:
+        """The node and everything computed from it, in creation order."""
+        with self._lock:
+            doomed = {self._resolve(key)}
+            for nid, node in self._nodes.items():  # creation order = topological order
+                if doomed & set(node.parents):
+                    doomed.add(nid)
+            return [nid for nid in self._nodes if nid in doomed]
+
+    def delete_preview(self, key: str) -> dict[str, Any]:
+        """What :meth:`delete` would remove (for a confirmation)."""
+        ids = self.descendants(key)
+        figures = [f for f in self.plots.infos() if set(f["sources"]) & set(ids)]
+        return {
+            "ids": ids,
+            "names": [self._nodes[i].name for i in ids],
+            "figures": [f["name"] for f in figures],
+        }
+
+    def delete(self, key: str) -> dict[str, Any]:
+        """Remove a node and all its descendants (roots are the input data and stay)."""
+        with self._lock:
+            nid = self._resolve(key)
+            if self._nodes[nid].is_root:
+                raise CannotDelete(f"{self._nodes[nid].name} is data passed to fl.explore()")
+            ids = self.descendants(nid)
+            for i in ids:
+                node = self._nodes.pop(i)
+                if self._by_name.get(node.name) == i:
+                    del self._by_name[node.name]
+                self._results.pop(i, None)
+                self._encoders.pop(i, None)
+                future = self._futures.pop(i, None)
+                if future is not None:
+                    future.cancel()
+            self.rev += 1
+        self._emit("node.deleted", {"ids": ids})
+        figures = self.plots.drop_sources(set(ids))
+        return {"ids": ids, "figures": figures}
+
     def _compute(self, nid: str) -> Any:
         with self._lock:
-            node = self._nodes[nid]
+            node = self._nodes.get(nid)
+            if node is None:  # deleted while it was queued
+                raise UnknownNode(f"node {nid!r} was deleted")
             if any(self._nodes[p].state in _DEAD for p in node.parents):
                 node.state = NodeState.BLOCKED
                 self.rev += 1
@@ -203,6 +256,8 @@ class Session:
             self._emit("node.state", info)
             raise NodeError(node) from exc
         with self._lock:
+            if self._nodes.get(nid) is not node:  # deleted while computing
+                return value
             self._results[nid] = value
             node.kind, node.shape = classify(value)
             node.warnings = tuple(warns)
@@ -296,8 +351,18 @@ class Session:
                 "rev": self.rev,
                 "session_id": self.id,
                 "nodes": [n.info() for n in self._nodes.values()],
+                "figures": self.plots.infos(),  # type: ignore[typeddict-item]
                 "options": self._options.describe(),  # type: ignore[typeddict-item]
             }
+
+    @property
+    def figures(self) -> dict[str, Any]:
+        """Every figure drawn with all its data: ``{name: matplotlib Figure}``."""
+        out = {}
+        for fid in self.plots.ids():
+            figure = self.plots.figure(fid)
+            out[self.plots.get(fid)["spec"]["name"]] = figure
+        return out
 
     def close(self) -> None:
         self._lane.shutdown(wait=False)

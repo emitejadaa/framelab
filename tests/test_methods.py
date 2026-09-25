@@ -106,3 +106,50 @@ def test_op_preview_reports_invalid_ops(d):
 def test_summary_columns_carry_encoded_labels(d):
     res, _ = result(d, "node.summary", {"id": "n1"})
     assert [c["label"] for c in res["columns"]] == ["a", "b"]
+
+
+def test_plotter_methods(d):
+    catalog, _ = result(d, "plot.catalog", {})
+    assert "line" in [k["key"] for k in catalog["kinds"]]
+    fields, _ = result(d, "plot.fields", {"id": "ventas"})
+    assert [f["text"] for f in fields["fields"]] == ["a", "b"] and fields["index"]["kind"] == "num"
+    fig, _ = result(d, "figure.create", {"source": "n1"})
+    assert fig["id"] == "f1" and fig["spec"]["name"] == "fig_ventas"
+    spec = fig["spec"]
+    spec["axes"][0]["layers"] = [
+        {"kind": "bar", "source": "n1", "x": {"col": "b"}, "y": [{"col": "a"}]}
+    ]
+    state, _ = result(d, "figure.update", {"id": "f1", "spec": spec})
+    assert state["version"] == 2 and state["can_undo"]
+    meta, bufs = result(
+        d, "figure.render", {"id": "f1", "width_px": 300, "height_px": 200, "dpr": 2}
+    )
+    assert bufs[0].startswith(b"\x89PNG") and meta["errors"] == [] and meta["width"] <= 600
+    code, _ = result(d, "figure.code", {"id": "f1", "mode": "figure"})
+    assert 'ax_ventas.bar(ventas["b"], ventas["a"])' in code["code"]
+    meta, bufs = result(d, "figure.export", {"id": "f1", "format": "svg", "download": True})
+    assert meta["path"] is None and b"<svg" in bufs[0][:500]
+    assert result(d, "session.snapshot", {})[0]["figures"][0]["name"] == "fig_ventas"
+    env, _ = d.handle(req("figure.update", {"id": "f1", "spec": {"name": "x", "axes": "no"}}), [])
+    assert env["error"]["code"] == "invalid_figure"
+    env, _ = d.handle(req("figure.get", {"id": "f9"}), [])
+    assert env["error"]["code"] == "unknown_figure"
+    result(d, "figure.delete", {"id": "f1"})
+    assert result(d, "session.snapshot", {})[0]["figures"] == []
+
+
+def test_formula_and_delete_methods(d):
+    ok, _ = result(d, "formula.parse", {"id": "n1", "text": "(a + 1) * 2"})
+    assert ok["ok"] and ok["expr"]["t"] == "arith"
+    bad, _ = result(d, "formula.parse", {"id": "n1", "text": "a * nope"})
+    assert not bad["ok"] and "nope" in bad["message"] and bad["offset"] == 4
+    op = {"schema_v": 1, "kind": "setitem", "target": "n1", "name": "", "accessor": [], "args": [],
+          "kwargs": [], "key": "c", "expr": ok["expr"]}  # fmt: skip
+    node, _ = result(d, "node.apply", {"op": op})
+    child, _ = result(d, "node.apply", {"op": op_to_json(call(node["node"]["id"], "head", n=1))})
+    preview, _ = result(d, "node.delete_preview", {"id": node["node"]["id"]})
+    assert preview["ids"] == [node["node"]["id"], child["node"]["id"]]
+    out, _ = result(d, "node.delete", {"id": node["node"]["id"]})
+    assert out["ids"] == preview["ids"]
+    env, _ = d.handle(req("node.delete", {"id": "n1"}), [])
+    assert env["error"]["code"] == "cannot_delete"

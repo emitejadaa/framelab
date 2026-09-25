@@ -56,6 +56,9 @@ _ALLOWED = (
     ast.Sub,
     ast.Mult,
     ast.Div,
+    ast.FloorDiv,
+    ast.Mod,
+    ast.Pow,
 )
 
 

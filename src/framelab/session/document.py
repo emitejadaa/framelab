@@ -68,6 +68,7 @@ def to_document(session: Session) -> dict[str, Any]:
         "framelab_version": __version__,
         "pandas_version": pd.__version__,
         "graph": {"version": 1, "nodes": nodes},
+        "figures": {"version": 1, "items": session.plots.to_json()},
     }
 
 
@@ -134,4 +135,9 @@ def from_document(
         )
         if entry.get("name_auto", True) and session.node(entry["id"]).name != entry["name"]:
             warnings.append(f"{entry['name']} was renamed to {session.node(entry['id']).name}")
+    for item in (doc.get("figures") or {}).get("items", []):
+        try:
+            session.plots.restore(item["id"], item["spec"], item.get("exported"))
+        except (FramelabError, KeyError, TypeError) as exc:
+            warnings.append(f"figure {item.get('id')!r} could not be restored: {exc}")
     return session, warnings

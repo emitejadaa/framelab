@@ -154,3 +154,52 @@ def test_a_failing_listener_does_not_break_computation(session):
     node = session.apply(call("n1", "head", n=1))
     assert len(session.wait(node.id, timeout=5)) == 1
     assert session.node(node.id).state is NodeState.READY
+
+
+# ---- deleting nodes ---------------------------------------------------------------------------
+def test_delete_removes_the_node_and_its_descendants(session):
+    head = session.apply(call("n1", "head", n=3))
+    col_node = session.apply(getitem(head.id, "monto"))
+    total = session.apply(call(col_node.id, "sum"))
+    other = session.apply(call("n1", "tail", n=2))
+    events = []
+    session.subscribe(lambda method, params: events.append((method, params)))
+    assert session.delete_preview(head.id)["names"] == [head.name, col_node.name, total.name]
+    out = session.delete(head.id)
+    assert out["ids"] == [head.id, col_node.id, total.id]
+    assert session.node_ids() == ["n1", other.id]
+    assert head.name not in session and total.id not in session
+    assert ("node.deleted", {"ids": out["ids"]}) in events
+    assert [n["id"] for n in session.snapshot()["nodes"]] == ["n1", other.id]
+    # the freed name can be used again, and ids are never reused
+    again = session.apply(call("n1", "head", n=3))
+    assert again.name == head.name and again.id not in out["ids"]
+
+
+def test_roots_cannot_be_deleted(session):
+    from framelab.session.core import CannotDelete
+
+    with pytest.raises(CannotDelete):
+        session.delete("ventas")
+
+
+def test_deleting_a_node_that_is_still_computing_is_safe(session):
+    slow = session.apply(call("n1", "head", n=2))
+    session.delete(slow.id)
+    time.sleep(0.2)
+    assert slow.id not in session and session.node_ids() == ["n1"]
+
+
+def test_deleting_a_source_drops_its_figure_layers(session):
+    head = session.apply(call("n1", "head", n=3))
+    fig = session.plots.create(head.id)
+    spec = fig["spec"]
+    spec["axes"][0]["layers"] = [
+        {"kind": "bar", "source": head.id, "x": {"col": "pais"}, "y": [{"col": "monto"}]},
+        {"kind": "line", "source": "n1", "y": [{"col": "cantidad"}]},
+    ]
+    session.plots.update(fig["id"], spec)
+    out = session.delete(head.id)
+    assert out["figures"] == [fig["id"]]
+    layers = session.plots.get(fig["id"])["spec"]["axes"][0]["layers"]
+    assert [ly["source"] for ly in layers] == ["n1"]

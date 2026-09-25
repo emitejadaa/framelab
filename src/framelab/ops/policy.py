@@ -165,8 +165,16 @@ def method_allowed(name: str) -> bool:
     return not (name.startswith("to_") and name not in SAFE_TO)
 
 
+# Element-wise helpers that are not ufuncs.
+NP_ELEMENTWISE = frozenset({"where"})
+
+
 def np_func_allowed(name: str) -> bool:
-    return isinstance(getattr(np, name, None), np.ufunc) or name in NP_REDUCTIONS
+    return (
+        isinstance(getattr(np, name, None), np.ufunc)
+        or name in NP_REDUCTIONS
+        or name in NP_ELEMENTWISE
+    )
 
 
 def _np_attrs() -> frozenset[str]:

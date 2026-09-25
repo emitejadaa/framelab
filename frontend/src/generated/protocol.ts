@@ -63,9 +63,18 @@ export interface NodeInfo {
   warnings?: string[];
 }
 
+export interface FigureInfo {
+  id: string;
+  name: string;
+  sources: string[];
+  kinds: string[];
+  nlayers: number;
+}
+
 export interface SessionSnapshot {
   rev: number;
   session_id: string;
   nodes: NodeInfo[];
+  figures: FigureInfo[];
   options: OptionDescription[];
 }

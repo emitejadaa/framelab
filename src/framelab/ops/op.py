@@ -12,6 +12,7 @@ from .values import (
     ACCESSORS,
     EXPR_TYPES,
     Expr,
+    Lit,
     OpError,
     Value,
     check_identifier,
@@ -105,7 +106,9 @@ class Op:
         elif self.kind == "filter":
             if not isinstance(self.expr, EXPR_TYPES):
                 raise OpError("filter needs a condition expression")
-        elif self.kind == "setitem" and (self.key is None or not isinstance(self.expr, EXPR_TYPES)):
+        elif self.kind == "setitem" and (
+            self.key is None or not isinstance(self.expr, (Lit, *EXPR_TYPES))
+        ):
             raise OpError("setitem needs a column label and a value expression")
         return self
 

@@ -69,8 +69,17 @@ class NodeInfo(TypedDict):
     warnings: NotRequired[list[str]]
 
 
+class FigureInfo(TypedDict):
+    id: str
+    name: str
+    sources: list[str]
+    kinds: list[str]
+    nlayers: int
+
+
 class SessionSnapshot(TypedDict):
     rev: int
     session_id: str
     nodes: list[NodeInfo]
+    figures: list[FigureInfo]
     options: list[OptionDescription]

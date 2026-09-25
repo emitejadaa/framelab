@@ -30,7 +30,9 @@ __all__ = [
     "ListV",
     "Lit",
     "NodeRef",
+    "NegE",
     "NotE",
+    "NpCall",
     "OpError",
     "This",
     "Value",
@@ -45,7 +47,7 @@ __all__ = [
 ]
 
 CMP_OPS = frozenset({"==", "!=", "<", "<=", ">", ">="})
-ARITH_OPS = frozenset({"+", "-", "*", "/"})
+ARITH_OPS = frozenset({"+", "-", "*", "/", "//", "%", "**"})
 ACCESSORS = frozenset({"str", "dt", "cat"})
 
 
@@ -86,8 +88,13 @@ def check_value(v: Any) -> Any:
     elif isinstance(v, BoolE):
         for i in v.items:
             check_value(i)
-    elif isinstance(v, NotE):
+    elif isinstance(v, (NotE, NegE)):
         check_value(v.item)
+    elif isinstance(v, NpCall):
+        if not np_func_allowed(v.name):
+            raise OpError(f"function np.{v.name} is not allowed")
+        for a in v.args:
+            check_value(a)
     elif isinstance(v, ListV):
         for i in v.items:
             check_value(i)
@@ -207,9 +214,24 @@ class NotE:
     item: Expr
 
 
-Expr = This | GetCol | CallE | AttrE | Cmp | Arith | BoolE | NotE
+@dataclass(frozen=True)
+class NegE:
+    """Unary minus: ``-x``."""
+
+    item: Value
+
+
+@dataclass(frozen=True)
+class NpCall:
+    """A numpy function applied element-wise: ``np.sqrt(x)``, ``np.where(c, a, b)``."""
+
+    name: str
+    args: tuple[Value, ...] = ()
+
+
+Expr = This | GetCol | CallE | AttrE | Cmp | Arith | BoolE | NotE | NegE | NpCall
 Value = Lit | Col | NodeRef | Func | ListV | DictV | Expr
-EXPR_TYPES = (This, GetCol, CallE, AttrE, Cmp, Arith, BoolE, NotE)
+EXPR_TYPES = (This, GetCol, CallE, AttrE, Cmp, Arith, BoolE, NotE, NegE, NpCall)
 
 
 # ---- scalar encoding (JSON-safe, lossless for literal-able values) --------------------------
@@ -350,6 +372,10 @@ def value_to_json(v: Value) -> dict[str, Any]:
         return {"t": "bool", "op": v.op, "items": [value_to_json(i) for i in v.items]}
     if isinstance(v, NotE):
         return {"t": "not", "item": value_to_json(v.item)}
+    if isinstance(v, NegE):
+        return {"t": "neg", "item": value_to_json(v.item)}
+    if isinstance(v, NpCall):
+        return {"t": "np", "name": v.name, "args": [value_to_json(a) for a in v.args]}
     raise OpError(f"not a value: {v!r}")
 
 
@@ -357,6 +383,14 @@ def _expr(obj: Any) -> Expr:
     v = value_from_json(obj)
     if not isinstance(v, EXPR_TYPES):
         raise OpError(f"expected an expression, got {obj!r}")
+    return v
+
+
+def _operand(obj: Any) -> Value:
+    """An arithmetic operand: an expression or a literal (``2 * x``)."""
+    v = value_from_json(obj)
+    if not isinstance(v, (Lit, *EXPR_TYPES)):
+        raise OpError(f"expected an expression or a literal, got {obj!r}")
     return v
 
 
@@ -406,8 +440,9 @@ def value_from_json(obj: Any) -> Value:
         allowed = CMP_OPS if t == "cmp" else ARITH_OPS
         if obj.get("op") not in allowed:
             raise OpError(f"operator {obj.get('op')!r} is not allowed")
-        cls = Cmp if t == "cmp" else Arith
-        return cls(_expr(obj["left"]), obj["op"], value_from_json(obj["right"]))
+        if t == "cmp":
+            return Cmp(_expr(obj["left"]), obj["op"], value_from_json(obj["right"]))
+        return Arith(_operand(obj["left"]), obj["op"], _operand(obj["right"]))
     if t == "bool":
         if obj.get("op") not in ("and", "or"):
             raise OpError(f"boolean operator {obj.get('op')!r} is not allowed")
@@ -417,6 +452,14 @@ def value_from_json(obj: Any) -> Value:
         return BoolE(obj["op"], items)
     if t == "not":
         return NotE(_expr(obj["item"]))
+    if t == "neg":
+        return NegE(_operand(obj["item"]))
+    if t == "np":
+        name = check_identifier(obj.get("name"), "numpy function")
+        args = obj.get("args", [])
+        if not isinstance(args, list) or not 1 <= len(args) <= 3:
+            raise OpError("a numpy function takes one to three arguments")
+        return check_value(NpCall(name, tuple(_operand(a) for a in args)))
     raise OpError(f"unknown value tag {t!r}")
 
 
@@ -444,6 +487,9 @@ def node_refs(v: Any) -> list[str]:
     elif isinstance(v, BoolE):
         for i in v.items:
             out += node_refs(i)
-    elif isinstance(v, NotE):
+    elif isinstance(v, (NotE, NegE)):
         out += node_refs(v.item)
+    elif isinstance(v, NpCall):
+        for a in v.args:
+            out += node_refs(a)
     return out

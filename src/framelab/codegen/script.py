@@ -7,7 +7,7 @@ from typing import Any
 
 from .render import render_op
 
-__all__ = ["node_script"]
+__all__ = ["node_script", "pipeline_lines", "used_imports"]
 
 _IMPORTS = {
     "pd": "import pandas as pd",
@@ -17,15 +17,14 @@ _IMPORTS = {
 }
 
 
-def _used_modules(body: str) -> list[str]:
+def used_imports(body: str) -> list[str]:
     names = {n.id for n in ast.walk(ast.parse(body)) if isinstance(n, ast.Name)}
     return [line for alias, line in _IMPORTS.items() if alias in names]
 
 
-def node_script(session: Any, key: str, mode: str = "origin") -> str:
+def pipeline_lines(session: Any, ids: list[str], mode: str = "origin") -> list[str]:
+    """The statements that create ``ids`` (roots become a comment or ``name = expr``)."""
     names = session.variable_names()
-    target = session.node(key)
-    ids = [target.id] if mode == "step" else session.lineage(target.id)
     lines: list[str] = []
     for nid in ids:
         node = session.node(nid)
@@ -39,8 +38,14 @@ def node_script(session: Any, key: str, mode: str = "origin") -> str:
                 )
             continue
         lines.append(render_op(node.op, node.name, names).display)
-    body = "\n".join(lines)
+    return lines
+
+
+def node_script(session: Any, key: str, mode: str = "origin") -> str:
+    target = session.node(key)
+    ids = [target.id] if mode == "step" else session.lineage(target.id)
+    body = "\n".join(pipeline_lines(session, ids, mode))
     if mode == "step":
         return body
-    imports = _used_modules(body) or ["import pandas as pd"]
+    imports = used_imports(body) or ["import pandas as pd"]
     return "\n".join(imports) + "\n\n" + body + "\n"
