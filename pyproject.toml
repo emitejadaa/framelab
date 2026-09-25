@@ -39,6 +39,9 @@ dependencies = [
   "platformdirs>=4",
 ]
 
+[project.scripts]
+framelab = "framelab.__main__:main"
+
 [project.optional-dependencies]
 desktop = ["pywebview>=6.2"]
 io = ["openpyxl", "tabulate", "jinja2", "lxml"]

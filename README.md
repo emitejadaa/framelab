@@ -1,47 +1,111 @@
 # framelab
 
-> 🇪🇸 Explorá, transformá y graficá DataFrames de pandas **sin escribir código** — y copiá siempre el código Python exacto que lo hace.
-> 🇬🇧 Explore, transform and plot pandas DataFrames **without writing code** — and always copy the exact Python code that does it.
-
-```python
-import framelab as fl
-
-fl.explore(ventas)   # abre la mesa de trabajo / opens the workbench
-```
-
-**Estado / Status:** en desarrollo temprano (pre-alpha). Todavía no está publicado en PyPI.
-Early development (pre-alpha). Not yet published on PyPI.
-
-## Qué es / What it is
-
-Una mesa de trabajo visual (estilo VS Code, interacción tipo Scratch) donde cada operación de pandas crea
-un nuevo nodo inmutable conectado a su origen. Cada nodo muestra el código Python real —con tus nombres de
-variables y columnas— que lo produce. Arrastrá cualquier nodo a la vista de **Tabla** para explorarlo, o a la
-vista de **Gráfico** para construir figuras de matplotlib con todas sus propiedades.
-
-A visual workbench (VS Code-like layout, Scratch-like interaction) where every pandas operation creates a new
-immutable node linked to its source. Every node shows the real Python code —with your own variable and column
-names— that produces it. Drag any node to the **Table** view to explore it, or to the **Plot** view to build
-matplotlib figures with all their properties.
-
-- Solo métodos y funciones existentes de pandas y matplotlib — nada inventado.
-- Funciona desde scripts (ventana propia) y dentro de Jupyter / VS Code notebooks.
-- Interfaz en español e inglés.
-
-## Diseño / Design
-
-La especificación completa está en
-[`docs/superpowers/specs/2026-09-23-framelab-design.md`](docs/superpowers/specs/2026-09-23-framelab-design.md).
-
-## Desarrollo / Development
-
-Requisitos: Python ≥ 3.11, [mise](https://mise.jdx.dev) (Node 24 + pnpm fijados en `mise.toml`).
+## Instalación
 
 ```bash
-mise trust && mise install
-python3 -m venv .venv && source .venv/bin/activate
+pip install framelab
 ```
 
-## Licencia / License
+Requiere Python 3.11 o superior, en Linux, Windows o macOS. `pip` instala pandas, matplotlib y el resto de
+las dependencias; no hace falta Node ni compilar nada.
+
+Extras opcionales:
+
+```bash
+pip install "framelab[desktop]"   # ventana nativa (pywebview) en lugar de una ventana del navegador
+pip install "framelab[io]"        # leer y exportar Excel y otros formatos
+```
+
+> Todavía no está publicado en PyPI. Hasta la primera versión se instala desde el código fuente, con
+> [mise](https://mise.jdx.dev) para Node: `git clone https://github.com/emitejadaa/framelab && cd framelab && mise trust && mise install && pip install .`
+
+## Uso
+
+```python
+import pandas as pd
+import framelab as fl
+
+ventas = pd.read_csv("ventas.csv")
+res = fl.explore(ventas)
+```
+
+- En un script, `explore()` abre una ventana, espera a que la cierres y devuelve la sesión.
+- En Jupyter o en notebooks de VS Code, se muestra dentro del notebook y no bloquea la celda.
+
+Varios DataFrames o Series, y nombres:
+
+```python
+fl.explore(ventas, clientes)       # los nombres salen de tus variables
+fl.explore(ventas=df)              # nombre explícito
+fl.explore(df, name="ventas")
+fl.explore(ventas, mode="window")  # "auto" (por defecto), "inline" o "window"
+```
+
+La sesión devuelta:
+
+```python
+res["ventas_filt"]                 # el resultado de un nodo creado en la interfaz
+res.code("ventas_filt")            # el código pandas que lo produce desde los datos originales
+res.code("ventas_filt", mode="step")  # solo ese paso
+res.names                          # los nombres de todos los nodos
+res.figures["fig_ventas"]          # las figuras de matplotlib creadas en el Ploter
+fl.last_session()                  # la sesión del último explore()
+```
+
+Opciones:
+
+```python
+fl.options.general.language = "en"          # "auto", "es" o "en"
+fl.set_option("general.theme", "dark")      # "system", "light" o "dark"
+fl.set_option("general.open_mode", "window")
+fl.get_option("general.language")
+fl.reset_option("general.theme")
+```
+
+Desde la terminal, con archivos CSV, TSV, Parquet, JSON, Excel o Feather:
+
+```bash
+framelab ventas.csv clientes.parquet
+```
+
+---
+
+## Installation
+
+```bash
+pip install framelab
+```
+
+Python 3.11 or newer on Linux, Windows or macOS. `pip` installs pandas, matplotlib and every other
+dependency; no Node and no compiling. Optional extras: `framelab[desktop]` (native window through
+pywebview) and `framelab[io]` (Excel and other formats).
+
+> Not on PyPI yet. Until the first release, install from source with [mise](https://mise.jdx.dev) for Node:
+> `git clone https://github.com/emitejadaa/framelab && cd framelab && mise trust && mise install && pip install .`
+
+## Usage
+
+```python
+import pandas as pd
+import framelab as fl
+
+sales = pd.read_csv("sales.csv")
+res = fl.explore(sales)            # a window from scripts (blocks until closed), inline in notebooks
+
+fl.explore(sales, customers)       # several DataFrames or Series, named after your variables
+fl.explore(sales=df)               # explicit names
+fl.explore(sales, mode="window")   # "auto" (default), "inline" or "window"
+
+res["sales_filt"]                  # a node's result
+res.code("sales_filt")             # the pandas code that produces it (mode="step": that step only)
+res.figures["fig_sales"]           # matplotlib figures built in the Plotter
+fl.last_session()
+
+fl.options.general.language = "en"   # also general.theme and general.open_mode; set_option/get_option
+```
+
+```bash
+framelab sales.csv customers.parquet
+```
 
 MIT © 2026 Emiliano Tejada
