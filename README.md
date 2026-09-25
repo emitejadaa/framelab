@@ -16,8 +16,7 @@ pip install "framelab[desktop]"   # ventana nativa (pywebview) en lugar de una v
 pip install "framelab[io]"        # leer y exportar Excel y otros formatos
 ```
 
-> Todavía no está publicado en PyPI. Hasta la primera versión se instala desde el código fuente, con
-> [mise](https://mise.jdx.dev) para Node: `git clone https://github.com/emitejadaa/framelab && cd framelab && mise trust && mise install && pip install .`
+Para actualizar a la última versión: `pip install -U framelab`.
 
 ## Uso
 
@@ -80,8 +79,7 @@ Python 3.11 or newer on Linux, Windows or macOS. `pip` installs pandas, matplotl
 dependency; no Node and no compiling. Optional extras: `framelab[desktop]` (native window through
 pywebview) and `framelab[io]` (Excel and other formats).
 
-> Not on PyPI yet. Until the first release, install from source with [mise](https://mise.jdx.dev) for Node:
-> `git clone https://github.com/emitejadaa/framelab && cd framelab && mise trust && mise install && pip install .`
+Upgrade with `pip install -U framelab`.
 
 ## Usage
 

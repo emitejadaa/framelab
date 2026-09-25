@@ -31,7 +31,7 @@ sección por sección, investigada (4 agentes, versiones de sept-2026) y sometid
 | Errores | nodo de error rojo en el lienzo |
 | Tabla | ver y operar; orden de encabezado visual + "convertir en paso"; modificar columna = copia + asignación |
 | Preferencias | pantalla estilo VS Code + `fl.options` estilo `pd.options`; ayuda = tooltips de docs |
-| Alcance | todo completo antes de publicar (internamente por hitos) |
+| Alcance | por hitos; **publicación continua en PyPI** (decisión del 2026-09-25: cada push a `main` que cambia el paquete publica `0.0.<commits>` vía trusted publishing, tras pasar la CI) |
 | Sesiones | guardar/abrir `.framelab` + reaplicar receta a otros datos |
 | Repo | GitHub público `emitejadaa/framelab`, MIT, commits directos a `main` |
 | Ritmo | avanzar sin frenar entre hitos (resumen al final de cada uno) |
@@ -448,7 +448,7 @@ cierra con verificación + borrado de tests de andamio + resumen breve al usuari
   traducciones completas. *Verificar:* E2E 6 (Galata), tests de CLI y recetas.
 - **M8 — Endurecimiento y publicación.** Benchmarks 1M/5M, ajuste de guardas y caché, accesibilidad básica,
   CI verde (3 SO × Python 3.11–3.14 + pandas/matplotlib últimas), docs es/en, re-auditoría de seguridad,
-  tamaño de wheel/bundle, release 0.1.0 a PyPI (requiere cuenta/token del usuario → única pausa prevista).
+  tamaño de wheel/bundle, versión 0.1.0 (la publicación en PyPI ya es continua desde 2026-09-25).
 
 ## Riesgos principales y mitigación
 - APIs privadas/provisionales de pandas y matplotlib → adaptadores, tests por versión, CI contra últimas/nightly,
@@ -465,7 +465,7 @@ cierra con verificación + borrado de tests de andamio + resumen breve al usuari
 
 ## Forma de trabajo
 - Avanzar sin frenar entre hitos; resumen breve al cerrar cada uno (qué se hizo, cómo probarlo, qué sigue).
-  Solo me detengo ante bloqueos reales (credenciales, p. ej. PyPI en M8) o decisiones irreversibles no cubiertas.
+  Solo me detengo ante bloqueos reales (credenciales) o decisiones irreversibles no cubiertas.
 - Commits chicos y descriptivos directo a `main` con push a `emitejadaa/framelab`.
 - La spec en `docs/superpowers/specs/` es la fuente de verdad y se actualiza cuando cambia una decisión.
 - Memoria del proyecto: guardar como feedback la política de tests mínimos en frontend y el ritmo "sin frenar".

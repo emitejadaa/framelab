@@ -78,3 +78,60 @@ jobs:
       - run: pip install -e . --group dev
       - name: packaging, real-browser E2E and notebook kernel
         run: python -m pytest -m slow -v
+
+  # Every push to main that changes the package publishes a new version to PyPI
+  # (0.0.<number of commits>) once every check above has passed.
+  publish:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [lint, test, slow]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/framelab/
+    permissions:
+      id-token: write # PyPI trusted publishing: no token stored in GitHub
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: did the package change?
+        id: changed
+        run: |
+          before="${{ github.event.before }}"
+          paths="src frontend/src frontend/package.json frontend/pnpm-lock.yaml pyproject.toml README.md LICENSE hatch_build.py"
+          if git cat-file -e "$before" 2>/dev/null && git diff --quiet "$before" "${{ github.sha }}" -- $paths; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "Only docs, tests or CI changed: nothing to publish."
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/download-artifact@v4
+        if: steps.changed.outputs.publish == 'true'
+        with:
+          name: static
+          path: src/framelab/_static
+      - uses: actions/setup-python@v5
+        if: steps.changed.outputs.publish == 'true'
+        with:
+          python-version: "3.14"
+      - name: stamp the version
+        if: steps.changed.outputs.publish == 'true'
+        run: |
+          version="0.0.$(git rev-list --count HEAD)"
+          sed -i "s/^__version__ = .*/__version__ = \"$version\"/" src/framelab/__init__.py
+          echo "Publishing framelab $version"
+      - name: build the sdist and the wheel
+        if: steps.changed.outputs.publish == 'true'
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+      - name: the wheel installs with pip and imports
+        if: steps.changed.outputs.publish == 'true'
+        run: |
+          python -m venv /tmp/check
+          /tmp/check/bin/pip install dist/*.whl
+          /tmp/check/bin/python -c "import framelab; print(framelab.__version__)"
+          /tmp/check/bin/framelab --help
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        if: steps.changed.outputs.publish == 'true'
