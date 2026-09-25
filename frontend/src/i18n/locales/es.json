@@ -12,8 +12,7 @@
     "rows": "{{count}} filas",
     "drop_table": "Tabla",
     "drop_plot": "Gráfico",
-    "plot_soon": "Los gráficos llegan en una próxima versión",
-    "hint": "Clic derecho en un nodo para operar · doble clic abre su tabla · arrastralo a ▦ Tabla"
+    "hint": "Clic derecho en un nodo para operar · doble clic abre su tabla · arrastralo a ▦ Tabla o ▟ Gráfico · Supr lo borra"
   },
   "tabs": {
     "workbench": "Workbench",
@@ -32,7 +31,10 @@
     "search": "Buscar operación…",
     "node": "Nodo",
     "open_table": "Abrir tabla",
-    "copy_code": "Copiar código"
+    "copy_code": "Copiar código",
+    "plot": "Graficar",
+    "delete": "Eliminar…",
+    "delete_short": "Eliminar"
   },
   "inspector": {
     "empty": "Elegí un nodo",
@@ -65,7 +67,8 @@
     "missing": "Completá «{{field}}»",
     "bad_number": "Escribí un número",
     "bad_bool": "Escribí true o false",
-    "bad_date": "Escribí una fecha como 2024-01-31"
+    "bad_date": "Escribí una fecha como 2024-01-31",
+    "bad_formula": "Revisá la fórmula"
   },
   "ops": {
     "category": {
@@ -96,7 +99,7 @@
     "drop_columns": "Quitar columnas",
     "rename": "Renombrar columna",
     "astype": "Cambiar tipo",
-    "new_column": "Columna nueva (cálculo)",
+    "new_column": "Columna nueva (fórmula)",
     "reset_index": "Índice a columna (reset_index)",
     "to_frame": "A tabla (to_frame)",
     "groupby": "Agrupar por",
@@ -150,7 +153,8 @@
       "new_name": "Nombre nuevo",
       "dtype": "Tipo nuevo",
       "left": "Columna",
-      "right": "Columna"
+      "right": "Columna",
+      "formula": "Fórmula"
     }
   },
   "errors": {
@@ -159,6 +163,211 @@
     "internal": "Error interno",
     "unknown_method": "Solicitud desconocida",
     "bad_request": "Solicitud inválida",
-    "protocol_mismatch": "Versiones incompatibles"
+    "protocol_mismatch": "Versiones incompatibles",
+    "invalid_figure": "Configuración de gráfico inválida",
+    "unknown_figure": "La figura ya no existe",
+    "cannot_delete": "No se puede eliminar",
+    "invalid_formula": "Fórmula inválida"
+  },
+  "plot": {
+    "kind": {
+      "line": "Líneas",
+      "scatter": "Dispersión",
+      "bar": "Barras",
+      "barh": "Barras horizontales",
+      "hist": "Histograma",
+      "box": "Caja (boxplot)",
+      "violin": "Violín",
+      "pie": "Torta",
+      "area": "Áreas apiladas",
+      "step": "Escalones",
+      "hexbin": "Densidad (hexbin)",
+      "heatmap": "Mapa de calor"
+    },
+    "kind_help": {
+      "line": "Evolución de valores a lo largo del índice o de una columna (fechas).",
+      "scatter": "Relación entre dos columnas numéricas; color y tamaño por columna.",
+      "bar": "Compara valores por categoría (ideal tras agrupar).",
+      "barh": "Barras acostadas: mejor con nombres largos.",
+      "hist": "Cómo se distribuyen los valores de una columna.",
+      "box": "Mediana, cuartiles y atípicos; separable por grupo.",
+      "violin": "Forma de la distribución por columna o grupo.",
+      "pie": "Partes de un total (pocas categorías, valores positivos).",
+      "area": "Varias series apiladas en el tiempo.",
+      "step": "Valores que cambian a saltos.",
+      "hexbin": "Densidad de muchos puntos en celdas hexagonales.",
+      "heatmap": "Una tabla numérica como colores (pivot, corr)."
+    },
+    "prop": {
+      "color": "Color",
+      "edgecolor": "Color de borde",
+      "alpha": "Opacidad",
+      "linewidth": "Grosor de línea",
+      "linestyle": "Estilo de línea",
+      "marker": "Marcador",
+      "markersize": "Tamaño del marcador",
+      "s": "Tamaño del punto",
+      "size_max": "Tamaño máximo",
+      "cmap": "Mapa de colores",
+      "colorbar": "Barra de colores",
+      "width": "Ancho de barra",
+      "height": "Alto de barra",
+      "bins": "Intervalos (bins)",
+      "density": "Densidad (normalizar)",
+      "cumulative": "Acumulado",
+      "histtype": "Tipo",
+      "stacked": "Apilado",
+      "orientation": "Orientación",
+      "showmeans": "Mostrar medias",
+      "notch": "Muesca",
+      "showfliers": "Mostrar atípicos",
+      "showmedians": "Mostrar medianas",
+      "autopct": "Mostrar porcentajes",
+      "startangle": "Ángulo inicial",
+      "where": "Dónde salta",
+      "gridsize": "Cantidad de celdas"
+    },
+    "family": {
+      "lines": "Líneas y áreas",
+      "bars": "Barras",
+      "distribution": "Distribución",
+      "points": "Puntos",
+      "parts": "Partes de un total",
+      "matrix": "Matrices"
+    },
+    "scale": {
+      "linear": "lineal",
+      "log": "logarítmica",
+      "symlog": "log simétrica"
+    },
+    "op": {
+      "contains": "contiene",
+      "isna": "está vacío",
+      "notna": "no está vacío"
+    },
+    "rows": {
+      "title": "Filas",
+      "which": "Qué filas usar",
+      "all": "Todas",
+      "head": "Las primeras N",
+      "tail": "Las últimas N",
+      "sample": "Una muestra de N",
+      "filter": "Las que cumplen…",
+      "n": "N",
+      "column": "Columna"
+    },
+    "map": {
+      "x": "Eje X",
+      "labels": "Etiquetas",
+      "y": "Eje Y",
+      "y_many": "Columnas (eje Y)",
+      "values": "Valores",
+      "columns_all": "Columnas (ninguna = todas)",
+      "hue": "Separar por",
+      "color_by": "Color según",
+      "size_by": "Tamaño según"
+    },
+    "fig": {
+      "name": "Nombre (variable)",
+      "name_hint": "fig_…",
+      "suptitle": "Título general",
+      "style": "Estilo",
+      "style_default": "predeterminado",
+      "size": "Tamaño",
+      "width": "Ancho",
+      "height": "Alto",
+      "dpi": "Resolución",
+      "grid": "Grilla de ejes",
+      "rows": "Filas",
+      "cols": "Columnas",
+      "sharex": "Compartir eje X",
+      "sharey": "Compartir eje Y"
+    },
+    "axes": {
+      "title": "Título",
+      "xlabel": "Etiqueta X",
+      "ylabel": "Etiqueta Y",
+      "label_auto": "Automática (nombre de columna)",
+      "label_none": "Sin etiqueta",
+      "label_custom": "Personalizada",
+      "legend": "Leyenda",
+      "legend_auto": "Automática",
+      "legend_none": "Sin leyenda",
+      "scales": "Escalas y límites",
+      "xlim": "Límites X (mín · máx)",
+      "ylim": "Límites Y (mín · máx)",
+      "xrotation": "Rotar etiquetas X",
+      "grid": "Mostrar grilla"
+    },
+    "export": {
+      "button": "Exportar…",
+      "title": "Exportar {{name}}",
+      "format": "Formato",
+      "transparent": "Fondo transparente",
+      "file": "Archivo",
+      "file_hint": "relativo a la carpeta donde corre Python",
+      "download": "Descargar",
+      "save": "Guardar en la carpeta",
+      "close": "Cerrar",
+      "saved": "Guardado en {{path}} (y agregado al código)",
+      "downloaded": "Descarga iniciada"
+    },
+    "figure": "Figura",
+    "axes_n": "Ejes {{n}}",
+    "cell": "fila {{row}}, col {{col}}",
+    "layer": "Capa",
+    "kind_label": "Tipo de gráfico",
+    "data": "Datos",
+    "choose_data": "Elegí un DataFrame",
+    "mapping": "Qué graficar",
+    "legend": "Leyenda",
+    "label": "Texto en la leyenda",
+    "style": "Estilo",
+    "auto": "auto",
+    "none": "— ninguna —",
+    "choose": "— elegí —",
+    "reset": "Volver al valor por defecto",
+    "index": "índice",
+    "index_named": "índice ({{name}})",
+    "values": "valores",
+    "values_named": "valores ({{name}})",
+    "missing_column": "columna que ya no existe",
+    "suggested": "Sugeridos para estos datos",
+    "all_columns": "todas las columnas",
+    "by_x": "según {{x}}",
+    "split_by": "separado por {{col}}",
+    "add_layer": "Agregar gráfico",
+    "remove_layer": "Quitar esta capa",
+    "move_up": "Subir",
+    "move_down": "Bajar",
+    "undo": "Deshacer",
+    "redo": "Rehacer",
+    "dismiss": "Cerrar mensaje",
+    "empty_figure": "sin capas",
+    "sampled": "vista previa con una muestra · exportar usa todos los datos",
+    "preview_alt": "Vista previa del gráfico",
+    "code_full": "Completo",
+    "code_figure": "Solo la figura"
+  },
+  "delete": {
+    "title": "¿Eliminar {{name}}?",
+    "alone": "Se elimina este nodo. Los datos originales no cambian.",
+    "with_children_one": "También se elimina {{count}} nodo que sale de este:",
+    "with_children_other": "También se eliminan los {{count}} nodos que salen de este:",
+    "figures": "Las figuras {{names}} pierden las capas que usaban estos datos.",
+    "confirm": "Eliminar"
+  },
+  "formula": {
+    "placeholder": "(precio - costo) * cantidad",
+    "help": "Usá los nombres de columna, números, + − * / ** y paréntesis. Nombres con espacios van entre `acentos graves`. Funciones: abs, round, sqrt, log, exp, fillna, clip, where, maximum, minimum; métodos como fecha.dt.year o nombre.str.upper().",
+    "fn": {
+      "abs": "valor absoluto",
+      "round": "redondear a N decimales",
+      "sqrt": "raíz cuadrada",
+      "log": "logaritmo natural",
+      "fillna": "reemplazar vacíos",
+      "where": "si… entonces… si no…",
+      "maximum": "el mayor de dos valores"
+    }
   }
 }

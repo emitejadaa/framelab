@@ -7,7 +7,8 @@ import type { OpJson } from "../ops/build";
 import { useAppStore } from "../state/context";
 import { usePortalContainer } from "../ui/portal";
 import { applyOp } from "./applyOp";
-import { defaults, type FieldSpec, opByKey, ValueError, type Values } from "./opsCatalog";
+import { FormulaField } from "./FormulaField";
+import { defaults, type FieldSpec, type FormulaValue, opByKey, ValueError, type Values } from "./opsCatalog";
 
 interface Preview {
   name: string;
@@ -39,6 +40,13 @@ export function OpForm() {
     if (!op || !node || !summary.data) return { op: null, error: null };
     for (const f of op.fields) {
       const v = values[f.key];
+      if (f.type === "formula") {
+        const formula = v as FormulaValue | undefined;
+        if (!formula?.text.trim()) return { op: null, error: t("form.missing", { field: t(f.label) }) };
+        if (formula.message) return { op: null, error: formula.message };
+        if (!formula.expr) return { op: null, error: null }; // still parsing
+        continue;
+      }
       if (!f.optional && (v === "" || v === undefined || (Array.isArray(v) && v.length === 0))) {
         return { op: null, error: t("form.missing", { field: t(f.label) }) };
       }
@@ -92,6 +100,7 @@ export function OpForm() {
   };
 
   const set = (key: string, value: unknown) => setValues((v) => ({ ...v, [key]: value }));
+  const setFormula = (key: string) => (next: FormulaValue) => set(key, next);
 
   const field = (f: FieldSpec) => {
     const value = values[f.key];
@@ -127,6 +136,15 @@ export function OpForm() {
               </option>
             ))}
           </select>
+        );
+      case "formula":
+        return (
+          <FormulaField
+            nodeId={node.id}
+            columns={columns}
+            value={(value as FormulaValue) ?? { text: "", expr: null, message: null }}
+            onChange={setFormula(f.key)}
+          />
         );
       case "columns": {
         const chosen = new Set(Array.isArray(value) ? (value as number[]) : []);

@@ -2,13 +2,20 @@ import { useTranslation } from "react-i18next";
 import { useSummary, useWindow } from "../data/hooks";
 import { useAppStore } from "../state/context";
 import { DataTable } from "../table/DataTable";
+import { useState } from "react";
+import { useRpc } from "../data/rpcContext";
 import { bytesText, isTabular, KIND_ICON, shapeText } from "./format";
+import { isPlottable, plotNode } from "./plotting";
 
 export function Inspector() {
   const { t } = useTranslation();
   const node = useAppStore((s) => s.snapshot?.nodes.find((n) => n.id === s.selectedId) ?? null);
   const openTable = useAppStore((s) => s.openTable);
   const openMenu = useAppStore((s) => s.openMenu);
+  const openPlot = useAppStore((s) => s.openPlot);
+  const askDelete = useAppStore((s) => s.askDelete);
+  const rpc = useRpc();
+  const [problem, setProblem] = useState<string | null>(null);
   const summary = useSummary(node?.id ?? null, node?.state ?? "");
   const preview = useWindow(node && isTabular(node.kind) ? node.id : null, node?.state ?? "", 0, 10);
   if (!node) return <aside className="fl-inspector fl-muted">{t("inspector.empty")}</aside>;
@@ -43,7 +50,27 @@ export function Inspector() {
             ▦ {t("menu.open_table")}
           </button>
         ) : null}
+        {isPlottable(node.kind) ? (
+          <button
+            type="button"
+            className="fl-btn"
+            disabled={node.state !== "ready"}
+            onClick={() =>
+              plotNode(rpc, node.id)
+                .then(openPlot)
+                .catch((err) => setProblem(String(err?.message ?? err)))
+            }
+          >
+            ▟ {t("menu.plot")}
+          </button>
+        ) : null}
+        {node.parents.length > 0 ? (
+          <button type="button" className="fl-btn fl-btn-quiet-danger" title={t("menu.delete")} onClick={() => askDelete(node.id)}>
+            {t("menu.delete_short")}
+          </button>
+        ) : null}
       </div>
+      {problem ? <div className="fl-form-error">{problem}</div> : null}
       {node.error ? (
         <div className="fl-form-error">
           <strong>{node.error.type}</strong>: {node.error.message}

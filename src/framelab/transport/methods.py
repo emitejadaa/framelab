@@ -108,6 +108,10 @@ def register_session_methods(dispatcher: Dispatcher) -> None:
     dispatcher.register("plot.fields", lambda params, _b: plots.fields(_id(params)))
     dispatcher.register("plot.suggest", lambda params, _b: {"layers": plots.suggest(_id(params))})
     dispatcher.register(
+        "plot.default_layer",
+        lambda params, _b: plots.default_layer(_id(params), _str(params, "kind")),
+    )
+    dispatcher.register(
         "figure.create",
         lambda params, _b: plots.create(params.get("source"), name=params.get("name")),
     )

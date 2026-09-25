@@ -29,7 +29,14 @@ export const CATEGORY_ORDER: Category[] = [
   "dates",
 ];
 
-export type FieldType = "number" | "text" | "column" | "columns" | "bool" | "choice" | "value";
+export type FieldType = "number" | "text" | "column" | "columns" | "bool" | "choice" | "value" | "formula";
+
+/** A formula field's state: the text and what Python parsed it into. */
+export interface FormulaValue {
+  text: string;
+  expr: Value | null;
+  message: string | null;
+}
 
 export interface FieldSpec {
   key: string;
@@ -342,22 +349,13 @@ export const OPS: OpSpec[] = [
     kinds: DF,
     fields: [
       { key: "new_name", type: "text", label: "ops.field.new_name" },
-      { key: "left", type: "column", label: "ops.field.left" },
-      {
-        key: "operator",
-        type: "choice",
-        label: "ops.field.operator",
-        options: ["+", "-", "*", "/"].map((o) => ({ value: o, label: o })),
-        default: "*",
-      },
-      { key: "right", type: "column", label: "ops.field.right" },
+      { key: "formula", type: "formula", label: "ops.field.formula" },
     ],
-    build: (t, v, s) =>
-      b.setitemOp(
-        t,
-        String(v.new_name ?? ""),
-        b.arith(b.getcol(label(s, v.left)), String(v.operator), b.getcol(label(s, v.right))),
-      ),
+    build: (t, v) => {
+      const formula = v.formula as FormulaValue | undefined;
+      if (!formula?.expr) throw new ValueError("formula");
+      return b.setitemOp(t, String(v.new_name ?? ""), formula.expr);
+    },
   },
   simpleCall("reset_index", "reset_index", "transform", TABULAR),
   simpleCall("to_frame", "to_frame", "transform", SERIES),
@@ -447,6 +445,7 @@ export function defaults(op: OpSpec): Values {
     if (f.default !== undefined) out[f.key] = f.default;
     else if (f.type === "column") out[f.key] = 0;
     else if (f.type === "columns") out[f.key] = [];
+    else if (f.type === "formula") out[f.key] = { text: "", expr: null, message: null } satisfies FormulaValue;
     else out[f.key] = "";
   }
   return out;

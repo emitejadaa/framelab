@@ -1,8 +1,10 @@
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../state/context";
 import { TableView } from "../table/TableView";
+import { PlotView } from "../plot/PlotView";
 import { Canvas } from "../workbench/Canvas";
 import { CodePanel } from "../workbench/CodePanel";
+import { DeleteDialog } from "../workbench/DeleteDialog";
 import { Inspector } from "../workbench/Inspector";
 import { NodeMenu } from "../workbench/NodeMenu";
 import { OpForm } from "../workbench/OpForm";
@@ -12,7 +14,11 @@ function Tabs() {
   const { t } = useTranslation();
   const view = useAppStore((s) => s.view);
   const tables = useAppStore((s) => s.tables);
+  const plots = useAppStore((s) => s.plots);
   const nodes = useAppStore((s) => s.snapshot?.nodes ?? []);
+  const figures = useAppStore((s) => s.snapshot?.figures ?? []);
+  const openPlot = useAppStore((s) => s.openPlot);
+  const closePlot = useAppStore((s) => s.closePlot);
   const showWorkbench = useAppStore((s) => s.showWorkbench);
   const openTable = useAppStore((s) => s.openTable);
   const closeTable = useAppStore((s) => s.closeTable);
@@ -31,6 +37,20 @@ function Tabs() {
               ▦ {name}
             </button>
             <button type="button" className="fl-tab-close" aria-label={t("tabs.close")} onClick={() => closeTable(id)}>
+              ×
+            </button>
+          </span>
+        );
+      })}
+      {plots.map((id) => {
+        const name = figures.find((f) => f.id === id)?.name ?? id;
+        const active = view.kind === "plot" && view.figureId === id;
+        return (
+          <span key={id} className="fl-tab" data-active={active ? "true" : "false"}>
+            <button type="button" onClick={() => openPlot(id)}>
+              ▟ {name}
+            </button>
+            <button type="button" className="fl-tab-close" aria-label={t("tabs.close")} onClick={() => closePlot(id)}>
               ×
             </button>
           </span>
@@ -63,6 +83,8 @@ export function Shell() {
       <Tabs />
       {view.kind === "table" ? (
         <TableView key={view.nodeId} nodeId={view.nodeId} />
+      ) : view.kind === "plot" ? (
+        <PlotView key={view.figureId} figureId={view.figureId} />
       ) : (
         <div className="fl-workbench">
           <div className="fl-center">
@@ -75,6 +97,7 @@ export function Shell() {
       {connection === "connecting" ? <div className="fl-banner">{t("app.reconnecting")}</div> : null}
       <NodeMenu />
       <OpForm />
+      <DeleteDialog />
     </div>
   );
 }

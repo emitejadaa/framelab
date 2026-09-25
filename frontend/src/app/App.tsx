@@ -73,7 +73,7 @@ export function App({ transport }: { transport: Transport }) {
     // Python owns the graph: on node events, re-read the snapshot (debounced).
     let refresh: ReturnType<typeof setTimeout> | undefined;
     const offNodes = rpc.onEvent("*", (_params, _buffers, env) => {
-      if (!env.method?.startsWith("node.")) return;
+      if (!env.method?.startsWith("node.") && !env.method?.startsWith("figure.")) return;
       clearTimeout(refresh);
       refresh = setTimeout(() => {
         void rpc

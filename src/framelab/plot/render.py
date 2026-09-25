@@ -208,4 +208,3 @@ def png_bytes(figure: Figure, dpi: float) -> tuple[bytes, int, int]:
         + chunk(b"IEND", b"")
     )
     return data, width, height
-

@@ -10,7 +10,7 @@ import pandas as pd
 from ..codegen.literals import label_text
 from ..ops.values import OpError, encode_scalar
 
-__all__ = ["field_kind", "fields", "suggestions"]
+__all__ = ["default_layer", "field_kind", "fields", "suggestions"]
 
 SAMPLE = 5_000
 MAX_CATEGORIES = 40
@@ -128,3 +128,38 @@ def suggestions(value: Any, source: str) -> list[dict[str, Any]]:
     if nums and len(nums) == len(cols) and info["rows"] <= 60 and len(cols) <= 60:
         add("heatmap")
     return out
+
+
+def default_layer(value: Any, source: str, kind: str) -> dict[str, Any]:
+    """A first mapping for ``kind`` on this data, so a new layer draws something right away."""
+    info = fields(value)
+    layer: dict[str, Any] = {"kind": kind, "source": source}
+    if not info["tabular"]:
+        return layer
+    if info["series"]:
+        layer["y"] = [{"values": True}]
+        return layer
+    cols = info["fields"]
+    nums = [f["ref"] for f in cols if f["kind"] == "num"]
+    dates = [f["ref"] for f in cols if f["kind"] == "date"]
+    others = [f["ref"] for f in cols if f["kind"] != "num"]
+    by_index = info["index"]["kind"] in ("date", "cat")
+    if kind in ("line", "step", "area"):
+        if dates and not by_index:
+            layer["x"] = dates[0]
+        layer["y"] = nums[: 2 if kind == "area" else 1]
+    elif kind in ("scatter", "hexbin"):
+        if len(nums) >= 2:
+            layer["x"], layer["y"] = nums[0], nums[1:2]
+        elif nums:
+            layer["x"] = (dates or others or [None])[0]
+            layer["y"] = nums[:1]
+    elif kind in ("bar", "barh", "pie"):
+        if not by_index and others:
+            layer["x"] = others[0]
+        layer["y"] = nums[:1]
+    elif kind in ("hist", "box", "violin"):
+        layer["y"] = nums[:1]
+    elif kind == "heatmap" and len(nums) != len(cols):
+        layer["y"] = nums
+    return {k: v for k, v in layer.items() if v is not None}

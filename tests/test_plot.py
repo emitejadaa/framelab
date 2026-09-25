@@ -349,3 +349,11 @@ def test_copied_code_draws_the_same_image_as_the_export(session, ventas, tmp_pat
     env = {**os.environ, "MPLBACKEND": "Agg"}
     subprocess.run([sys.executable, "-c", program], check=True, env=env)
     assert compare_images(str(expected), str(actual), tol=2) is None
+
+
+@pytest.mark.parametrize("kind", list(KINDS))
+def test_default_layers_draw_something(session, kind):
+    layer = session.plots.default_layer("n1", kind)
+    fig = figure_with(session, layer)
+    _, meta = session.plots.render(fig["id"], width_px=300, height_px=200)
+    assert meta["errors"] == [], (layer, meta)

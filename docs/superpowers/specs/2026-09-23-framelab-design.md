@@ -431,6 +431,15 @@ cierra con verificación + borrado de tests de andamio + resumen breve al usuari
   filas, separar por columna, paneles de propiedades, preview en vivo + decimación, exportar escrito por
   Python, nodos figura, multi-df, revincular fuente, duplicar con…, deshacer. *Verificar:* diff de imagen
   export vs script exportado.
+  **Entregado antes de tiempo (2026-09-24, a pedido del usuario):** núcleo usable del Ploter —
+  12 tipos (line, scatter, bar/grouped_bar, barh, hist, box, violin, pie, area, step, hexbin, heatmap),
+  spec JSON validado (`plot/spec.py`), mapeo x/y/índice/valores, separar por, color/tamaño por columna,
+  filas (head/tail/sample/filtro), propiedades desde el catálogo Python, grilla de ejes, estilos, límites,
+  escalas, leyenda, deshacer/rehacer, sugerencias, preview con muestra, exportar escrito por Python y
+  nodo figura en el lienzo. El código copiado dibuja los mismos píxeles que el export (test lento).
+  Pendiente de M5: artistas/llamadas de ejes, revincular por arrastre, duplicar con…, mosaicos/twinx.
+  También: borrar nodos (con descendientes; las figuras pierden esas capas) y fórmulas para columna
+  nueva (`ops/formula.py`: paréntesis, + − * / // % **, funciones y métodos, parseadas a Expr).
 - **M6 — Ploter interacción y estilo.** Hit-map, selección, arrastres → código, zoom/pan → límites, anotaciones,
   líneas de referencia, estilos, ciclos, colormaps, fuentes, plantillas. *Verificar:* E2E 5.
 - **M7 — Preferencias, sesiones, Jupyter, archivos.** Pantalla de preferencias + `fl.options` + persistencia +

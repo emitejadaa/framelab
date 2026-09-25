@@ -9,6 +9,7 @@ import { usePortalContainer } from "../ui/portal";
 import { applyOp } from "./applyOp";
 import { isTabular } from "./format";
 import { CATEGORY_ORDER, type OpSpec, opsFor } from "./opsCatalog";
+import { isPlottable, plotNode } from "./plotting";
 
 export function NodeMenu() {
   const { t } = useTranslation();
@@ -18,6 +19,8 @@ export function NodeMenu() {
   const closeMenu = useAppStore((s) => s.closeMenu);
   const openForm = useAppStore((s) => s.openForm);
   const openTable = useAppStore((s) => s.openTable);
+  const openPlot = useAppStore((s) => s.openPlot);
+  const askDelete = useAppStore((s) => s.askDelete);
   const select = useAppStore((s) => s.select);
   const node = useAppStore((s) => s.snapshot?.nodes.find((n) => n.id === s.menu?.nodeId) ?? null);
   const summary = useSummary(node?.id ?? null, node?.state ?? "");
@@ -52,6 +55,14 @@ export function NodeMenu() {
       const created = await applyOp(rpc, op.build(node.id, {}, summary.data));
       select(created.id);
       closeMenu();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const plot = async () => {
+    try {
+      openPlot(await plotNode(rpc, node.id));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -107,9 +118,20 @@ export function NodeMenu() {
                 ▦ {t("menu.open_table")}
               </button>
             ) : null}
+            {ready && isPlottable(node.kind) ? (
+              <button type="button" className="fl-menu-item" onClick={() => void plot()}>
+                ▟ {t("menu.plot")}
+              </button>
+            ) : null}
             <button type="button" className="fl-menu-item" onClick={() => void copyCode()}>
               {t("menu.copy_code")}
             </button>
+            {node.parents.length > 0 ? (
+              <button type="button" className="fl-menu-item fl-menu-danger" onClick={() => askDelete(node.id)}>
+                {t("menu.delete")}
+                <span className="fl-menu-more">Supr</span>
+              </button>
+            ) : null}
           </div>
           {error ? <div className="fl-menu-error">{error}</div> : null}
         </div>

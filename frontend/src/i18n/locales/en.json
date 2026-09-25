@@ -12,8 +12,7 @@
     "rows": "{{count}} rows",
     "drop_table": "Table",
     "drop_plot": "Plot",
-    "plot_soon": "Plots arrive in a later version",
-    "hint": "Right-click a node for operations · double-click to open its table · drag it onto ▦ Table"
+    "hint": "Right-click a node to operate · double-click opens its table · drag it to ▦ Table or ▟ Chart · Delete removes it"
   },
   "tabs": {
     "workbench": "Workbench",
@@ -32,7 +31,10 @@
     "search": "Search operation…",
     "node": "Node",
     "open_table": "Open table",
-    "copy_code": "Copy code"
+    "copy_code": "Copy code",
+    "plot": "Plot",
+    "delete": "Delete…",
+    "delete_short": "Delete"
   },
   "inspector": {
     "empty": "Select a node",
@@ -65,7 +67,8 @@
     "missing": "Fill in “{{field}}”",
     "bad_number": "Type a number",
     "bad_bool": "Type true or false",
-    "bad_date": "Type a date like 2024-01-31"
+    "bad_date": "Type a date like 2024-01-31",
+    "bad_formula": "Check the formula"
   },
   "ops": {
     "category": {
@@ -96,7 +99,7 @@
     "drop_columns": "Drop columns",
     "rename": "Rename column",
     "astype": "Change type",
-    "new_column": "New column (calculation)",
+    "new_column": "New column (formula)",
     "reset_index": "Index to column (reset_index)",
     "to_frame": "To table (to_frame)",
     "groupby": "Group by",
@@ -150,7 +153,8 @@
       "new_name": "New name",
       "dtype": "New type",
       "left": "Column",
-      "right": "Column"
+      "right": "Column",
+      "formula": "Formula"
     }
   },
   "errors": {
@@ -159,6 +163,211 @@
     "internal": "Internal error",
     "unknown_method": "Unknown request",
     "bad_request": "Invalid request",
-    "protocol_mismatch": "Version mismatch"
+    "protocol_mismatch": "Version mismatch",
+    "invalid_figure": "Invalid chart settings",
+    "unknown_figure": "The figure no longer exists",
+    "cannot_delete": "Cannot delete",
+    "invalid_formula": "Invalid formula"
+  },
+  "plot": {
+    "kind": {
+      "line": "Line",
+      "scatter": "Scatter",
+      "bar": "Bars",
+      "barh": "Horizontal bars",
+      "hist": "Histogram",
+      "box": "Box plot",
+      "violin": "Violin",
+      "pie": "Pie",
+      "area": "Stacked area",
+      "step": "Step",
+      "hexbin": "Density (hexbin)",
+      "heatmap": "Heatmap"
+    },
+    "kind_help": {
+      "line": "Values along the index or a column (dates).",
+      "scatter": "Two numeric columns against each other; color and size by column.",
+      "bar": "Compare values per category (great after a groupby).",
+      "barh": "Bars on their side: better for long names.",
+      "hist": "How a column's values are distributed.",
+      "box": "Median, quartiles and outliers; split by group.",
+      "violin": "The shape of a distribution per column or group.",
+      "pie": "Parts of a whole (few categories, positive values).",
+      "area": "Several series stacked over time.",
+      "step": "Values that change in jumps.",
+      "hexbin": "Density of many points in hexagonal cells.",
+      "heatmap": "A numeric table as colors (pivot, corr)."
+    },
+    "prop": {
+      "color": "Color",
+      "edgecolor": "Edge color",
+      "alpha": "Opacity",
+      "linewidth": "Line width",
+      "linestyle": "Line style",
+      "marker": "Marker",
+      "markersize": "Marker size",
+      "s": "Point size",
+      "size_max": "Largest size",
+      "cmap": "Colormap",
+      "colorbar": "Colorbar",
+      "width": "Bar width",
+      "height": "Bar height",
+      "bins": "Bins",
+      "density": "Density (normalize)",
+      "cumulative": "Cumulative",
+      "histtype": "Type",
+      "stacked": "Stacked",
+      "orientation": "Orientation",
+      "showmeans": "Show means",
+      "notch": "Notch",
+      "showfliers": "Show outliers",
+      "showmedians": "Show medians",
+      "autopct": "Show percentages",
+      "startangle": "Start angle",
+      "where": "Where it steps",
+      "gridsize": "Number of cells"
+    },
+    "family": {
+      "lines": "Lines and areas",
+      "bars": "Bars",
+      "distribution": "Distribution",
+      "points": "Points",
+      "parts": "Parts of a whole",
+      "matrix": "Matrices"
+    },
+    "scale": {
+      "linear": "linear",
+      "log": "log",
+      "symlog": "symmetric log"
+    },
+    "op": {
+      "contains": "contains",
+      "isna": "is empty",
+      "notna": "is not empty"
+    },
+    "rows": {
+      "title": "Rows",
+      "which": "Which rows",
+      "all": "All",
+      "head": "The first N",
+      "tail": "The last N",
+      "sample": "A sample of N",
+      "filter": "Those where…",
+      "n": "N",
+      "column": "Column"
+    },
+    "map": {
+      "x": "X axis",
+      "labels": "Labels",
+      "y": "Y axis",
+      "y_many": "Columns (Y axis)",
+      "values": "Values",
+      "columns_all": "Columns (none = all)",
+      "hue": "Split by",
+      "color_by": "Color by",
+      "size_by": "Size by"
+    },
+    "fig": {
+      "name": "Name (variable)",
+      "name_hint": "fig_…",
+      "suptitle": "Figure title",
+      "style": "Style",
+      "style_default": "default",
+      "size": "Size",
+      "width": "Width",
+      "height": "Height",
+      "dpi": "Resolution",
+      "grid": "Axes grid",
+      "rows": "Rows",
+      "cols": "Columns",
+      "sharex": "Share X axis",
+      "sharey": "Share Y axis"
+    },
+    "axes": {
+      "title": "Title",
+      "xlabel": "X label",
+      "ylabel": "Y label",
+      "label_auto": "Automatic (column name)",
+      "label_none": "No label",
+      "label_custom": "Custom",
+      "legend": "Legend",
+      "legend_auto": "Automatic",
+      "legend_none": "No legend",
+      "scales": "Scales and limits",
+      "xlim": "X limits (min · max)",
+      "ylim": "Y limits (min · max)",
+      "xrotation": "Rotate X labels",
+      "grid": "Show grid"
+    },
+    "export": {
+      "button": "Export…",
+      "title": "Export {{name}}",
+      "format": "Format",
+      "transparent": "Transparent background",
+      "file": "File",
+      "file_hint": "relative to the folder Python runs in",
+      "download": "Download",
+      "save": "Save to the folder",
+      "close": "Close",
+      "saved": "Saved to {{path}} (and added to the code)",
+      "downloaded": "Download started"
+    },
+    "figure": "Figure",
+    "axes_n": "Axes {{n}}",
+    "cell": "row {{row}}, col {{col}}",
+    "layer": "Layer",
+    "kind_label": "Chart type",
+    "data": "Data",
+    "choose_data": "Choose a DataFrame",
+    "mapping": "What to plot",
+    "legend": "Legend",
+    "label": "Legend text",
+    "style": "Style",
+    "auto": "auto",
+    "none": "— none —",
+    "choose": "— choose —",
+    "reset": "Back to the default",
+    "index": "index",
+    "index_named": "index ({{name}})",
+    "values": "values",
+    "values_named": "values ({{name}})",
+    "missing_column": "a column that no longer exists",
+    "suggested": "Suggested for this data",
+    "all_columns": "every column",
+    "by_x": "by {{x}}",
+    "split_by": "split by {{col}}",
+    "add_layer": "Add a chart",
+    "remove_layer": "Remove this layer",
+    "move_up": "Move up",
+    "move_down": "Move down",
+    "undo": "Undo",
+    "redo": "Redo",
+    "dismiss": "Dismiss",
+    "empty_figure": "no layers",
+    "sampled": "preview uses a sample · exports use all the data",
+    "preview_alt": "Chart preview",
+    "code_full": "Complete",
+    "code_figure": "Figure only"
+  },
+  "delete": {
+    "title": "Delete {{name}}?",
+    "alone": "This node is removed. The original data does not change.",
+    "with_children_one": "{{count}} node made from it is removed too:",
+    "with_children_other": "The {{count}} nodes made from it are removed too:",
+    "figures": "The figures {{names}} lose the layers that used this data.",
+    "confirm": "Delete"
+  },
+  "formula": {
+    "placeholder": "(price - cost) * quantity",
+    "help": "Use column names, numbers, + − * / ** and parentheses. Names with spaces go between `backticks`. Functions: abs, round, sqrt, log, exp, fillna, clip, where, maximum, minimum; methods like date.dt.year or name.str.upper().",
+    "fn": {
+      "abs": "absolute value",
+      "round": "round to N decimals",
+      "sqrt": "square root",
+      "log": "natural logarithm",
+      "fillna": "replace empty values",
+      "where": "if… then… else…",
+      "maximum": "the larger of two values"
+    }
   }
 }

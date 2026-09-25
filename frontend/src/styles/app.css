@@ -98,3 +98,80 @@
 .fl-root .fl-badge { font-size: 10px; font-weight: 500; padding: 0 5px; border-radius: 4px; background: var(--fl-hover); color: var(--fl-warning); }
 .fl-root .fl-banner { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); padding: 6px 12px; border-radius: 6px; background: var(--fl-fg); color: var(--fl-bg); font-size: 12px; }
 @keyframes fl-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+/* ---- workbench additions ---- */
+.fl-root .fl-figure-card { width: 190px; border-style: dashed; }
+.fl-root .fl-card-icon[data-kind="Figure"] { color: var(--fl-accent); }
+.fl-root .fl-edge-figure .react-flow__edge-path { stroke-dasharray: 4 4; }
+.fl-root .fl-canvas-error { position: absolute; top: 56px; right: 10px; max-width: 360px; padding: 6px 10px; border-radius: 6px; background: var(--fl-panel); border: 1px solid var(--fl-danger); color: var(--fl-danger); font-size: 12px; text-align: left; }
+.fl-root .fl-menu-danger { color: var(--fl-danger); }
+.fl-root .fl-btn-danger { background: var(--fl-danger); border-color: var(--fl-danger); color: #fff; }
+.fl-root .fl-btn-quiet-danger { color: var(--fl-danger); }
+.fl-root .fl-delete-list { font-family: var(--fl-font-mono); font-size: 12px; color: var(--fl-muted); max-height: 120px; overflow: auto; }
+.fl-root .fl-ok { color: var(--fl-success, #16a34a); font-size: 12.5px; word-break: break-all; }
+.fl-root .fl-mono { font-family: var(--fl-font-mono); }
+/* formula editor */
+.fl-root .fl-formula { display: flex; flex-direction: column; gap: 6px; }
+.fl-root .fl-formula-input { height: auto; min-height: 52px; padding: 6px 8px; font-family: var(--fl-font-mono); font-size: 13px; resize: vertical; }
+.fl-root .fl-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.fl-root .fl-chip { padding: 1px 7px; border: 1px solid var(--fl-border); border-radius: 999px; font-family: var(--fl-font-mono); font-size: 11.5px; background: var(--fl-bg); }
+.fl-root .fl-chip:hover { border-color: var(--fl-accent); color: var(--fl-accent); }
+.fl-root .fl-chip-op { min-width: 26px; }
+.fl-root .fl-chip-fn { color: var(--fl-muted); }
+.fl-root .fl-formula-help { font-size: 11.5px; }
+/* ---- plotter ---- */
+.fl-root .fl-plotview { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.fl-root .fl-center-msg { display: grid; place-items: center; }
+.fl-root .fl-plot-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 230px minmax(0, 1fr) 320px; }
+.fl-root .fl-plot-left { min-height: 0; overflow: auto; border-right: 1px solid var(--fl-border); background: var(--fl-panel); }
+.fl-root .fl-plot-right { min-height: 0; overflow: auto; border-left: 1px solid var(--fl-border); background: var(--fl-panel); }
+.fl-root .fl-plot-center { min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) 200px; }
+.fl-root .fl-plot-code .fl-toolbar { height: 34px; }
+.fl-root .fl-toolbar-error { max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fl-danger); font-size: 12px; }
+.fl-root .fl-preview { position: relative; min-height: 0; display: grid; place-items: center; overflow: hidden; background: var(--fl-bg); background-image: radial-gradient(var(--fl-border) 1px, transparent 1px); background-size: 16px 16px; }
+.fl-root .fl-preview img { box-shadow: 0 1px 4px rgb(0 0 0 / .12); background: #fff; transition: opacity var(--fl-duration); }
+.fl-root .fl-preview[data-loading="true"] img { opacity: .6; }
+.fl-root .fl-preview-spin { position: absolute; top: 10px; right: 10px; }
+.fl-root .fl-preview-badge { position: absolute; left: 10px; top: 10px; padding: 2px 8px; border-radius: 999px; background: var(--fl-panel); border: 1px solid var(--fl-border); color: var(--fl-warning); font-size: 11px; }
+.fl-root .fl-preview-error { position: absolute; left: 10px; right: 10px; bottom: 10px; padding: 6px 10px; border-radius: 6px; background: var(--fl-panel); }
+.fl-root .fl-structure { display: flex; flex-direction: column; gap: 2px; padding: 8px; }
+.fl-root .fl-tree-item { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 28px; padding: 2px 8px; border-radius: 6px; text-align: left; }
+.fl-root .fl-tree-item:hover { background: var(--fl-hover); }
+.fl-root .fl-tree-item[data-active="true"] { background: color-mix(in srgb, var(--fl-accent) 14%, transparent); color: var(--fl-fg); }
+.fl-root .fl-tree-figure { font-weight: 600; }
+.fl-root .fl-tree-axes { display: flex; flex-direction: column; gap: 1px; margin-top: 6px; }
+.fl-root .fl-tree-layer { display: flex; align-items: center; padding-left: 14px; }
+.fl-root .fl-tree-layer .fl-kind-icon { width: 24px; height: 16px; flex: none; color: var(--fl-accent); }
+.fl-root .fl-tree-layer[data-error="true"] .fl-tree-item { color: var(--fl-danger); }
+.fl-root .fl-tree-layer[data-error="true"] .fl-kind-icon { color: var(--fl-danger); }
+.fl-root .fl-tree-tools { display: flex; opacity: 0; }
+.fl-root .fl-tree-layer:hover .fl-tree-tools { opacity: 1; }
+.fl-root .fl-tree-tools button { width: 20px; color: var(--fl-muted); }
+.fl-root .fl-tree-tools button:disabled { opacity: .3; }
+.fl-root .fl-tree-add { margin-left: 14px; padding: 3px 8px; border-radius: 6px; color: var(--fl-accent); text-align: left; font-size: 12.5px; }
+.fl-root .fl-tree-add:hover, .fl-root .fl-tree-add[data-active="true"] { background: color-mix(in srgb, var(--fl-accent) 10%, transparent); }
+.fl-root .fl-panel { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px 16px; }
+.fl-root .fl-psection { display: flex; flex-direction: column; gap: 8px; padding: 8px 0 10px; border-bottom: 1px solid var(--fl-border); }
+.fl-root .fl-psection-title { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--fl-muted); margin-top: 4px; }
+.fl-root .fl-prow { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.fl-root .fl-prow-label { display: flex; align-items: baseline; gap: 6px; font-size: 12px; }
+.fl-root .fl-prow-hint { font-family: var(--fl-font-mono); font-size: 10.5px; color: var(--fl-muted); }
+.fl-root .fl-prow-reset { margin-left: auto; color: var(--fl-accent); font-size: 12px; }
+.fl-root .fl-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.fl-root .fl-stack { display: flex; flex-direction: column; gap: 4px; }
+.fl-root .fl-slider { display: grid; grid-template-columns: 1fr 64px; gap: 8px; align-items: center; }
+.fl-root .fl-slider input[type="range"] { accent-color: var(--fl-accent); width: 100%; }
+.fl-root .fl-number { text-align: right; }
+.fl-root .fl-color { display: grid; grid-template-columns: 34px 1fr; gap: 6px; }
+.fl-root .fl-color input[type="color"] { width: 34px; height: 30px; padding: 2px; border: 1px solid var(--fl-border); border-radius: var(--fl-radius); background: var(--fl-bg); }
+.fl-root .fl-layer-error { padding: 8px 10px; border: 1px solid var(--fl-danger); border-radius: 6px; }
+.fl-root .fl-gallery { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px 16px; }
+.fl-root .fl-gallery-source { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center; }
+.fl-root .fl-suggestions { display: flex; flex-direction: column; gap: 6px; }
+.fl-root .fl-suggestion { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--fl-border); border-radius: 8px; text-align: left; background: var(--fl-bg); }
+.fl-root .fl-suggestion > span { display: flex; flex-direction: column; min-width: 0; font-size: 12.5px; }
+.fl-root .fl-suggestion .fl-muted { font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fl-root .fl-suggestion:hover, .fl-root .fl-kind:hover:not(:disabled) { border-color: var(--fl-accent); }
+.fl-root .fl-suggestion .fl-kind-icon, .fl-root .fl-kind .fl-kind-icon { color: var(--fl-accent); flex: none; }
+.fl-root .fl-kinds { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.fl-root .fl-kind { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px; border: 1px solid var(--fl-border); border-radius: 8px; font-size: 11.5px; background: var(--fl-bg); }
+.fl-root .fl-kind:disabled { opacity: .45; }

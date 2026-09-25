@@ -2,7 +2,10 @@ import { createStore } from "zustand/vanilla";
 import type { HelloResult, SessionSnapshot } from "../generated/protocol";
 
 export type ConnectionState = "connecting" | "ready" | "mismatch" | "error";
-export type View = { kind: "workbench" } | { kind: "table"; nodeId: string };
+export type View =
+  | { kind: "workbench" }
+  | { kind: "table"; nodeId: string }
+  | { kind: "plot"; figureId: string };
 
 export interface MenuState {
   nodeId: string;
@@ -23,19 +26,24 @@ export interface AppState {
   selectedId: string | null;
   view: View;
   tables: string[];
+  plots: string[];
   menu: MenuState | null;
   form: FormState | null;
+  deleting: string | null;
   setConnection(connection: ConnectionState, error?: string | null): void;
   setHello(hello: HelloResult): void;
   setSnapshot(snapshot: SessionSnapshot): void;
   select(id: string | null): void;
   openTable(id: string): void;
   closeTable(id: string): void;
+  openPlot(figureId: string): void;
+  closePlot(figureId: string): void;
   showWorkbench(): void;
   openMenu(menu: MenuState): void;
   closeMenu(): void;
   openForm(form: FormState): void;
   closeForm(): void;
+  askDelete(nodeId: string | null): void;
 }
 
 export type AppStore = ReturnType<typeof createAppStore>;
@@ -50,15 +58,31 @@ export function createAppStore() {
     selectedId: null,
     view: { kind: "workbench" },
     tables: [],
+    plots: [],
     menu: null,
     form: null,
+    deleting: null,
     setConnection: (connection, error = null) => set({ connection, error }),
     setHello: (hello) => set({ hello }),
     setSnapshot: (snapshot) =>
-      set((s) => ({
-        snapshot,
-        selectedId: s.selectedId ?? snapshot.nodes[0]?.id ?? null,
-      })),
+      set((s) => {
+        // Python owns the graph: forget tabs and selections of deleted nodes and figures.
+        const nodes = new Set(snapshot.nodes.map((n) => n.id));
+        const figures = new Set(snapshot.figures.map((f) => f.id));
+        const gone =
+          (s.view.kind === "table" && !nodes.has(s.view.nodeId)) ||
+          (s.view.kind === "plot" && !figures.has(s.view.figureId));
+        const selected = s.selectedId && nodes.has(s.selectedId) ? s.selectedId : null;
+        return {
+          snapshot,
+          selectedId: selected ?? snapshot.nodes[0]?.id ?? null,
+          tables: s.tables.filter((id) => nodes.has(id)),
+          plots: s.plots.filter((id) => figures.has(id)),
+          view: gone ? { kind: "workbench" } : s.view,
+          menu: s.menu && nodes.has(s.menu.nodeId) ? s.menu : null,
+          form: s.form && nodes.has(s.form.nodeId) ? s.form : null,
+        };
+      }),
     select: (selectedId) => set({ selectedId }),
     openTable: (id) =>
       set((s) => ({
@@ -72,10 +96,22 @@ export function createAppStore() {
         tables: s.tables.filter((t) => t !== id),
         view: s.view.kind === "table" && s.view.nodeId === id ? { kind: "workbench" } : s.view,
       })),
+    openPlot: (figureId) =>
+      set((s) => ({
+        plots: s.plots.includes(figureId) ? s.plots : [...s.plots, figureId],
+        view: { kind: "plot", figureId },
+        menu: null,
+      })),
+    closePlot: (figureId) =>
+      set((s) => ({
+        plots: s.plots.filter((f) => f !== figureId),
+        view: s.view.kind === "plot" && s.view.figureId === figureId ? { kind: "workbench" } : s.view,
+      })),
     showWorkbench: () => set({ view: { kind: "workbench" } }),
     openMenu: (menu) => set({ menu, selectedId: menu.nodeId }),
     closeMenu: () => set({ menu: null }),
     openForm: (form) => set({ form, menu: null }),
     closeForm: () => set({ form: null }),
+    askDelete: (deleting) => set({ deleting, menu: null }),
   }));
 }

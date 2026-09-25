@@ -14,8 +14,8 @@ from ..codegen.script import pipeline_lines, used_imports
 from ..errors import BadRequest
 from ..naming import unique_name
 from ..plot.codegen import FigureCode, generate
-from ..plot.fields import fields, suggestions
-from ..plot.kinds import catalog
+from ..plot.fields import default_layer, fields, suggestions
+from ..plot.kinds import KINDS, catalog
 from ..plot.render import PREVIEW_ROWS, build, png_bytes, style_context
 from ..plot.spec import FigureSpecError, normalize
 from .node import NodeError, NotReady, UnknownNode
@@ -42,6 +42,7 @@ class FigureDoc:
     undo: list[dict[str, Any]] = field(default_factory=list)
     redo: list[dict[str, Any]] = field(default_factory=list)
     exported: dict[str, Any] | None = None
+    origin: str | None = None  # the node the figure was created from (the gallery's default)
 
     def sources(self) -> list[str]:
         out: list[str] = []
@@ -69,6 +70,7 @@ class FigureDoc:
             "can_undo": bool(self.undo),
             "can_redo": bool(self.redo),
             "exported": self.exported,
+            "origin": self.origin,
         }
 
 
@@ -122,7 +124,7 @@ class FigureStore:
             fid = f"f{self._next}"
             self._next += 1
             spec = normalize({"name": final}, set())
-            doc = self._docs[fid] = FigureDoc(fid, spec)
+            doc = self._docs[fid] = FigureDoc(fid, spec, origin=source)
             state = self._changed(doc)
         state["suggestions"] = self.suggest(source) if source else []
         return state
@@ -215,6 +217,12 @@ class FigureStore:
         except (NodeError, NotReady):
             return []
         return suggestions(value, nid)
+
+    def default_layer(self, node: str, kind: str, timeout: float = 30.0) -> dict[str, Any]:
+        if kind not in KINDS:
+            raise BadRequest(f"unknown chart kind {kind!r}")
+        nid = self._session.node(node).id
+        return default_layer(self._session.wait(nid, timeout), nid, kind)
 
     def _code(self, doc: FigureDoc, timeout: float) -> tuple[FigureCode, dict[str, Any]]:
         names = self._session.variable_names()
