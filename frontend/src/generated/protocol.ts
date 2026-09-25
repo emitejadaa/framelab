@@ -2,7 +2,7 @@
 
 export const PROTOCOL_VERSION = 1 as const;
 export type MessageType = "req" | "res" | "evt" | "cancel";
-export type NodeKindName = "Unknown" | "DataFrame" | "Series" | "GroupBy" | "Index" | "Value";
+export type NodeKindName = "Unknown" | "DataFrame" | "Series" | "GroupBy" | "Index" | "Window" | "Value";
 export type NodeStateName = "pending" | "computing" | "ready" | "error" | "blocked" | "cancelled" | "freed";
 
 export interface ErrorInfo {

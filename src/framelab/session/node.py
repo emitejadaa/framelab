@@ -21,6 +21,7 @@ __all__ = [
     "NotReady",
     "UnknownNode",
     "classify",
+    "is_window",
 ]
 
 
@@ -40,6 +41,7 @@ class NodeKind(StrEnum):
     SERIES = "Series"
     GROUPBY = "GroupBy"
     INDEX = "Index"
+    WINDOW = "Window"  # rolling, expanding, ewm and resample objects
     VALUE = "Value"
 
 
@@ -104,7 +106,15 @@ def classify(value: Any) -> tuple[NodeKind, tuple[int, ...] | None]:
         return NodeKind.GROUPBY, None
     if isinstance(value, pd.Index):
         return NodeKind.INDEX, (int(len(value)),)
+    if is_window(value):
+        return NodeKind.WINDOW, None
     return NodeKind.VALUE, None
+
+
+def is_window(value: Any) -> bool:
+    from pandas.api.typing import Expanding, ExponentialMovingWindow, Resampler, Rolling, Window
+
+    return isinstance(value, (Rolling, Expanding, ExponentialMovingWindow, Resampler, Window))
 
 
 class NodeError(FramelabError):

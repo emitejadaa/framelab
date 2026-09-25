@@ -13,6 +13,7 @@ from concurrent.futures import CancelledError, Future
 from concurrent.futures import TimeoutError as FutureTimeout
 from typing import Any
 
+import numpy as np
 import pandas as pd
 import psutil
 
@@ -52,6 +53,51 @@ class NameTaken(FramelabError, ValueError):
 
 class CannotEdit(FramelabError, ValueError):
     code = "cannot_edit"
+
+
+def owners_for(value: Any) -> list[tuple[str, tuple[str, ...]]]:
+    """Catalog owners (and accessor) whose members apply to ``value``."""
+    from pandas.api.typing import (
+        DataFrameGroupBy,
+        Expanding,
+        ExponentialMovingWindow,
+        Resampler,
+        Rolling,
+        SeriesGroupBy,
+    )
+
+    if isinstance(value, pd.DataFrame):
+        return [("DataFrame", ())]
+    if isinstance(value, pd.Series):
+        out: list[tuple[str, tuple[str, ...]]] = [("Series", ())]
+        dtype = value.dtype
+        if isinstance(dtype, pd.CategoricalDtype):
+            out.append(("cat", ("cat",)))
+        elif (
+            pd.api.types.is_datetime64_any_dtype(dtype)
+            or isinstance(dtype, pd.PeriodDtype)
+            or pd.api.types.is_timedelta64_dtype(dtype)
+        ):
+            out.append(("dt", ("dt",)))
+        elif isinstance(dtype, np.dtype) and dtype.kind == "O":  # object: look at the values
+            if pd.api.types.infer_dtype(value.head(1000), skipna=True) in ("string", "empty"):
+                out.append(("str", ("str",)))
+        elif pd.api.types.is_string_dtype(dtype):
+            out.append(("str", ("str",)))
+        return out
+    for owner, types in (
+        ("DataFrameGroupBy", DataFrameGroupBy),
+        ("SeriesGroupBy", SeriesGroupBy),
+        ("Rolling", Rolling),
+        ("Expanding", Expanding),
+        ("ExponentialMovingWindow", ExponentialMovingWindow),
+        ("Resampler", Resampler),
+    ):
+        if isinstance(value, types):
+            return [(owner, ())]
+    if isinstance(value, pd.Index):
+        return [("Index", ())]
+    return []
 
 
 class Session:
@@ -754,6 +800,18 @@ class Session:
                     raise NotTabular(f"{self._nodes[nid].name} is not a table")
                 encoder = self._encoders[nid] = WindowEncoder(frame)
         return encoder.encode(offset, limit, col_start, col_stop)
+
+    def members(self, key: str, timeout: float = 30.0) -> list[dict[str, Any]]:
+        """Every pandas member this node offers (from the catalog), allowed and non-mutating."""
+        from ..catalog import load
+
+        catalog = load()
+        out = []
+        for owner, accessor in owners_for(self.wait(self._resolve(key), timeout)):
+            for member in catalog.members(owner):
+                if member.allowed and not member.mutates and member.kind in ("method", "property"):
+                    out.append({**member.describe(), "accessor": list(accessor)})
+        return out
 
     def summary(self, key: str, timeout: float = 30.0) -> dict:
         from ..table import summarize

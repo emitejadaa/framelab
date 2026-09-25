@@ -47,7 +47,7 @@ class OptionDescription(TypedDict):
     choices: NotRequired[list[Any]]
 
 
-NodeKindName = Literal["Unknown", "DataFrame", "Series", "GroupBy", "Index", "Value"]
+NodeKindName = Literal["Unknown", "DataFrame", "Series", "GroupBy", "Index", "Window", "Value"]
 NodeStateName = Literal["pending", "computing", "ready", "error", "blocked", "cancelled", "freed"]
 
 

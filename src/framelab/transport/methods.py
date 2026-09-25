@@ -193,6 +193,9 @@ def register_session_methods(dispatcher: Dispatcher) -> None:
 
     dispatcher.register("catalog.members", catalog_members)
     dispatcher.register(
+        "node.members", lambda params, _b: {"members": session.members(_id(params))}
+    )
+    dispatcher.register(
         "session.export",
         lambda params, _b: session.export(params.get("format", "py"), path=params.get("path")),
     )

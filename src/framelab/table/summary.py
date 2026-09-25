@@ -75,4 +75,12 @@ def summarize(obj: Any) -> dict[str, Any]:
         return out
     if isinstance(obj, pd.Index):
         return {"kind": "Index", "shape": [int(len(obj))], "dtype": str(obj.dtype)}
+    from ..session.node import is_window
+
+    if is_window(obj):
+        out = {"kind": "Window", "type": type(obj).__name__, "repr": _REPR.repr(obj)}
+        windowed = getattr(obj, "obj", None)  # the rolled or resampled data
+        if isinstance(windowed, pd.DataFrame):
+            out["columns"] = _columns(windowed.head(0))
+        return out
     return {"kind": "Value", "type": type(obj).__name__, "repr": _REPR.repr(obj)}
