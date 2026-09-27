@@ -275,11 +275,12 @@ class Session:
         with self._lock:
             names = self.variable_names()
             trail = self._trail(op.target) if op.target else ()
-            final = (
-                sanitize_identifier(name)
-                if name
-                else auto_node_name(op, names, self._taken_names(), trail)
-            )
+            if name:
+                final = sanitize_identifier(name)
+                if final in self._taken_names():
+                    raise NameTaken(f"{final!r} is already used by a node or a figure")
+            else:
+                final = auto_node_name(op, names, self._taken_names(), trail)
         style = self.code_style()
         return {
             "name": final,
@@ -574,7 +575,8 @@ class Session:
                 node.state = NodeState.COMPUTING
                 self.rev += 1
                 names = self.variable_names()
-                rendered = render_op(node.op, node.name, names)  # type: ignore[arg-type]
+                result = node.name  # a rename while it computes must not change the statement
+                rendered = render_op(node.op, result, names)  # type: ignore[arg-type]
                 info = node.info()
         if blocked_info is not None:
             self._emit("node.state", blocked_info)
@@ -586,7 +588,7 @@ class Session:
             env = {names[p]: v for p, v in parent_values.items()}
             if not node.force:
                 guards.check(node.op, parent_values, limit_bytes=self._guard_limit())  # type: ignore[arg-type]
-            value, warns = run_statement(rendered.executed, node.name, env)
+            value, warns = run_statement(rendered.executed, result, env)
         except Exception as exc:
             with self._lock:
                 node.state = NodeState.ERROR
@@ -651,16 +653,35 @@ class Session:
             if nid in self._results:
                 self._cache.touch(nid)
                 return self._results[nid]
-            node = self._nodes[nid]
+            node = self._nodes.get(nid)
+            if node is None:
+                raise UnknownNode(f"node {nid!r} was deleted")
             parents = node.parents
-        values = {p: self._value(p) for p in parents}
+        try:
+            values = {p: self._value(p) for p in parents}
+            with self._lock:
+                names = self.variable_names()
+                result = node.name
+                rendered = render_op(node.op, result, names)  # type: ignore[arg-type]
+            env = {names[p]: v for p, v in values.items()}
+            value, _ = run_statement(rendered.executed, result, env)
+        except Exception:
+            # it computed before, so this is transient (memory…): freed again, a later use retries
+            with self._lock:
+                if self._nodes.get(nid) is not node or node.state is NodeState.READY:
+                    raise
+                node.state = NodeState.FREED
+                self.rev += 1
+                info = node.info()
+            self._emit("node.state", info)
+            raise
         with self._lock:
-            names = self.variable_names()
-            rendered = render_op(node.op, node.name, names)  # type: ignore[arg-type]
-        env = {names[p]: v for p, v in values.items()}
-        value, _ = run_statement(rendered.executed, node.name, env)
-        with self._lock:
+            if self._nodes.get(nid) is not node:  # deleted meanwhile: keep nothing
+                return value
             victims = self._store(nid, value)
+            done: Future = Future()
+            done.set_result(value)
+            self._futures[nid] = done  # wait() reads the future of a ready node
             node.state = NodeState.READY
             self.rev += 1
             info = node.info()
@@ -802,10 +823,14 @@ class Session:
         with self._lock:
             encoder = self._encoders.get(cache_key)
         if encoder is None:
-            view = frame if sort is None else self._sorted(frame, sort)
-            encoder = WindowEncoder(view)
+            # a sorted view is the frame plus a row order (no copy); one per node at a time
+            order = None if sort is None else self._order(frame, sort)
+            encoder = WindowEncoder(frame, order=order)
             with self._lock:
                 if nid in self._nodes:
+                    if sort is not None:
+                        for old in [k for k in self._encoders if k.startswith(f"{nid}|")]:
+                            del self._encoders[old]
                     self._encoders[cache_key] = encoder
         data, meta = encoder.encode(offset, limit, col_start, col_stop)
         meta["sort"] = None if sort is None else {"column": sort[0], "ascending": sort[1]}
@@ -820,7 +845,8 @@ class Session:
         return frame
 
     @staticmethod
-    def _sorted(frame: pd.DataFrame, sort: tuple[int, bool]) -> pd.DataFrame:
+    def _order(frame: pd.DataFrame, sort: tuple[int, bool]) -> np.ndarray:
+        """Row positions of ``frame`` sorted by one column (stable, missing values last)."""
         column, ascending = sort
         if not 0 <= column < frame.shape[1]:
             raise BadRequest(f"there is no column at position {column}")
@@ -829,7 +855,7 @@ class Session:
             order = values.sort_values(ascending=ascending, kind="stable", na_position="last").index
         except TypeError as exc:
             raise BadRequest(f"this column cannot be sorted: {exc}") from None
-        return frame.iloc[order]
+        return order.to_numpy()
 
     def _drop_encoders(self, nid: str) -> None:
         for cache_key in [k for k in self._encoders if k == nid or k.startswith(f"{nid}|")]:
@@ -852,11 +878,15 @@ class Session:
         nid = self._resolve(key)
         value = self.wait(nid)
         frame = self._frame(nid, 30.0)
-        view = frame if sort is None else self._sorted(frame, sort)
-        if not (0 <= row < len(view) and 0 <= column < view.shape[1]):
+        if not (0 <= row < len(frame) and 0 <= column < frame.shape[1]):
             raise BadRequest("that cell is outside the table")
-        cell = view.iloc[row, column]
-        base = This() if isinstance(value, pd.Series) else GetCol(This(), view.columns[column])
+        if sort is not None:
+            row = int(self._order(frame, sort)[row])
+        if isinstance(value, pd.MultiIndex):
+            raise BadRequest("filter the table the MultiIndex comes from (by its columns)")
+        cell = frame.iloc[row, column]
+        one = isinstance(value, (pd.Series, pd.Index))  # the table shows it as one column
+        base = This() if one else GetCol(This(), frame.columns[column])
         if not pd.api.types.is_scalar(cell):
             raise BadRequest("only cells with a single value can filter")
         if pd.isna(cell):

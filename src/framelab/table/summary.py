@@ -38,6 +38,16 @@ def _columns(frame: pd.DataFrame) -> list[dict[str, Any]]:
     ]
 
 
+def _selected(obj: Any) -> pd.DataFrame | None:
+    """The columns a GroupBy or window works on: its selection (``gb[["a"]]``), without the
+    group keys. Private pandas API, so any failure falls back to the caller's guess."""
+    try:
+        frame = obj._obj_with_exclusions
+    except Exception:
+        return None
+    return frame if isinstance(frame, pd.DataFrame) else None
+
+
 def summarize(obj: Any) -> dict[str, Any]:
     from pandas.api.typing import DataFrameGroupBy, SeriesGroupBy
 
@@ -67,11 +77,14 @@ def summarize(obj: Any) -> dict[str, Any]:
             "ngroups": int(obj.ngroups),
             "keys": [label_text(k) for k in keys if not hasattr(k, "shape")],
         }
-        frame = getattr(obj, "obj", None)  # the grouped object (not documented, so guarded)
+        frame = _selected(obj)
+        if frame is None:
+            frame = getattr(obj, "obj", None)  # the whole grouped frame: drop the keys
+            if isinstance(frame, pd.DataFrame):
+                key_set = {repr(k) for k in keys}
+                frame = frame.iloc[:, [repr(c) not in key_set for c in frame.columns]]
         if isinstance(frame, pd.DataFrame):
-            key_set = {repr(k) for k in keys}
-            cols = frame[[c for c in frame.columns if repr(c) not in key_set]]
-            out["columns"] = _columns(cols.head(0))
+            out["columns"] = _columns(frame.head(0))
         return out
     if isinstance(obj, pd.Index):
         return {"kind": "Index", "shape": [int(len(obj))], "dtype": str(obj.dtype)}
@@ -79,7 +92,9 @@ def summarize(obj: Any) -> dict[str, Any]:
 
     if is_window(obj):
         out = {"kind": "Window", "type": type(obj).__name__, "repr": _REPR.repr(obj)}
-        windowed = getattr(obj, "obj", None)  # the rolled or resampled data
+        windowed = _selected(obj)
+        if windowed is None:
+            windowed = getattr(obj, "obj", None)  # the rolled or resampled data
         if isinstance(windowed, pd.DataFrame):
             out["columns"] = _columns(windowed.head(0))
         return out

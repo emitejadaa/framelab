@@ -209,8 +209,16 @@ def _convert(s: pd.Series, strategy: str, type_: pa.DataType | None) -> tuple[pa
 class WindowEncoder:
     """One per node: caches a conversion plan per column and reuses it for every window."""
 
-    def __init__(self, frame: pd.DataFrame, *, js_safe: bool = False, include_index: bool = True):
+    def __init__(
+        self,
+        frame: pd.DataFrame,
+        *,
+        order: np.ndarray | None = None,
+        js_safe: bool = False,
+        include_index: bool = True,
+    ):
         self.frame = frame
+        self.order = order  # row positions to show instead of the frame's own order (sorting)
         self.js_safe = js_safe
         self.include_index = include_index
         self._plans: dict[tuple[str, int], Plan] = {}
@@ -234,7 +242,10 @@ class WindowEncoder:
         self, offset: int = 0, limit: int = 1000, col_start: int = 0, col_stop: int | None = None
     ) -> tuple[bytes, dict]:
         offset = max(0, int(offset))
-        win = self.frame.iloc[offset : offset + max(0, int(limit)), col_start:col_stop]
+        rows = slice(offset, offset + max(0, int(limit)))
+        if self.order is not None:
+            rows = self.order[rows]
+        win = self.frame.iloc[rows, col_start:col_stop]
         arrays, fields, cols, index = [], [], [], []
         for key, s, label in self._series(win, col_start):
             plan = self._plans.get(key)

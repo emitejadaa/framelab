@@ -68,6 +68,17 @@ def _labels(value: Any) -> list[Any]:
     return list(value) if isinstance(value, (list, tuple)) else [value]
 
 
+def _key_counts(frame: pd.DataFrame, keys: list[Any], use_index: bool) -> pd.Series | None:
+    """How many rows have each key (columns, or the index levels)."""
+    try:
+        if use_index:
+            levels = list(range(frame.index.nlevels))
+            return frame.groupby(level=levels, dropna=False, observed=True).size()
+        return frame.groupby(keys, dropna=False, observed=True).size()
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
 def _merge(left: Any, right: Any, kw: Mapping[str, Any]) -> Estimate | None:
     if isinstance(right, pd.Series):
         right = right.to_frame()
@@ -76,19 +87,18 @@ def _merge(left: Any, right: Any, kw: Mapping[str, Any]) -> Estimate | None:
     how = kw.get("how") or "inner"
     if how == "cross":
         return Estimate(len(left) * len(right), left.shape[1] + right.shape[1])
-    if kw.get("left_index") or kw.get("right_index"):
-        return None
+    left_index, right_index = bool(kw.get("left_index")), bool(kw.get("right_index"))
     on = _labels(kw.get("on"))
-    lk = _labels(kw.get("left_on")) or on
-    rk = _labels(kw.get("right_on")) or on
-    if not lk and not rk:
+    lk = [] if left_index else _labels(kw.get("left_on")) or on
+    rk = [] if right_index else _labels(kw.get("right_on")) or on
+    if not (left_index or right_index or lk or rk):
         lk = rk = [c for c in left.columns if c in set(right.columns)]
-    if not lk or len(lk) != len(rk):
+    nl = left.index.nlevels if left_index else len(lk)
+    nr = right.index.nlevels if right_index else len(rk)
+    if not nl or nl != nr:
         return None
-    try:
-        lc = left.groupby(lk, dropna=False, observed=True).size()
-        rc = right.groupby(rk, dropna=False, observed=True).size()
-    except (KeyError, TypeError, ValueError):
+    lc, rc = _key_counts(left, lk, left_index), _key_counts(right, rk, right_index)
+    if lc is None or rc is None:
         return None
     rc.index = rc.index.set_names(lc.index.names)
     both = pd.concat([lc.rename("l"), rc.rename("r")], axis=1).fillna(0)
@@ -103,8 +113,19 @@ def _merge(left: Any, right: Any, kw: Mapping[str, Any]) -> Estimate | None:
     }.get(how)
     if rows is None:
         return None
-    shared = len(lk) if not kw.get("left_on") and not kw.get("right_on") else 0
-    return Estimate(rows, left.shape[1] + right.shape[1] - shared)
+    by_name = not (left_index or right_index or kw.get("left_on") or kw.get("right_on"))
+    return Estimate(rows, left.shape[1] + right.shape[1] - (len(lk) if by_name else 0))
+
+
+def _join(left: Any, other: Any, kw: Mapping[str, Any]) -> Estimate | None:
+    """``left.join(other, on=…)``: ``on`` columns (or the index) against ``other``'s index."""
+    on = _labels(kw.get("on"))
+    keys: dict[str, Any] = {"how": kw.get("how") or "left", "right_index": True}
+    if on:
+        keys["left_on"] = on
+    else:
+        keys["left_index"] = True
+    return _merge(left, other, keys)
 
 
 def _encoded(frame: pd.DataFrame) -> list[Any]:
@@ -178,6 +199,8 @@ def estimate(op: Op, values: Mapping[str, Any]) -> Estimate | None:
     if op.kind == "call" and not op.accessor:
         if op.name == "merge":
             return _merge(target, first if args else kw.get("right"), kw)
+        if op.name == "join":
+            return _join(target, first if args else kw.get("other"), kw)
         if op.name == "explode":
             return _explode(target, first if args else kw.get("column"))
         if op.name == "pivot_table":

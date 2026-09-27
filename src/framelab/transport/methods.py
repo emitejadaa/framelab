@@ -17,9 +17,9 @@ __all__ = ["register_session_methods"]
 
 
 def _int(params: dict[str, Any], key: str, default: int | None, *, minimum: int = 0) -> int | None:
-    value = params.get(key, default)
-    if value is None:
-        return None
+    value = params.get(key)
+    if value is None:  # missing or null: the default
+        return default
     if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
         raise BadRequest(f"{key} must be an integer >= {minimum}")
     return value
@@ -46,6 +46,16 @@ def _str(params: dict[str, Any], key: str) -> str:
     return value
 
 
+def _name(params: dict[str, Any]) -> str | None:
+    """An optional name for what is created (``None``: framelab picks one)."""
+    value = params.get("name")
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise BadRequest("name must be a non-empty string")
+    return value
+
+
 def _number(params: dict[str, Any], key: str, default: float) -> float:
     value = params.get(key, default)
     if isinstance(value, bool) or not isinstance(value, (int, float)):
@@ -61,7 +71,7 @@ def register_session_methods(dispatcher: Dispatcher) -> None:
     def apply(params: dict[str, Any], _buffers: list[bytes]) -> dict[str, Any]:
         node = session.apply(
             op_from_json(params.get("op")),
-            name=params.get("name"),
+            name=_name(params),
             force=params.get("force") is True,
         )
         return {"node": node.info()}
@@ -81,7 +91,7 @@ def register_session_methods(dispatcher: Dispatcher) -> None:
         data, meta = session.window(
             _id(params),
             offset=_int(params, "offset", 0),
-            limit=min(_int(params, "limit", 200), 5000),
+            limit=min(_int(params, "limit", 200) or 0, 5000),
             col_start=_int(params, "col_start", 0),
             col_stop=_int(params, "col_stop", None),
             sort=_sort(params),
@@ -103,7 +113,7 @@ def register_session_methods(dispatcher: Dispatcher) -> None:
         return {"code": session.code(_id(params), mode="step" if mode == "step" else "origin")}
 
     def preview(params: dict[str, Any], _buffers: list[bytes]) -> dict[str, Any]:
-        return session.preview(op_from_json(params.get("op")), name=params.get("name"))
+        return session.preview(op_from_json(params.get("op")), name=_name(params))
 
     def delete_preview(params: dict[str, Any], _buffers: list[bytes]) -> dict[str, Any]:
         return session.delete_preview(_id(params))
@@ -143,7 +153,7 @@ def register_session_methods(dispatcher: Dispatcher) -> None:
     )
     dispatcher.register(
         "figure.create",
-        lambda params, _b: plots.create(params.get("source"), name=params.get("name")),
+        lambda params, _b: plots.create(params.get("source"), name=_name(params)),
     )
     dispatcher.register("figure.get", lambda params, _b: plots.get(fid(params)))
     dispatcher.register(
@@ -197,7 +207,7 @@ def register_session_methods(dispatcher: Dispatcher) -> None:
             _id(params),
             op_from_json(params.get("op")),
             replay=params.get("replay", True) is not False,
-            name=params.get("name"),
+            name=_name(params),
         )
         return {"mapping": mapping}
 

@@ -67,8 +67,13 @@ class Dispatcher:
         handler = self._handlers.get(method)
         if handler is None:
             return make_error(msg_id, "unknown_method", f"unknown method {method!r}"), []
+        params = env.get("params")
+        if params is None:
+            params = {}
+        if not isinstance(params, dict):
+            return make_error(msg_id, "bad_request", "params must be an object"), []
         try:
-            out = handler(env.get("params", {}), buffers)
+            out = handler(params, buffers)
         except ProtocolMismatch as exc:
             return make_error(msg_id, "protocol_mismatch", str(exc)), []
         except FramelabError as exc:
