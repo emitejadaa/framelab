@@ -14,7 +14,14 @@ import numpy as np
 import pandas as pd
 
 from ..errors import FramelabError
-from ..ops.policy import MODULE_ATTRS, method_allowed
+from ..ops.policy import (
+    FUNC_REF,
+    FUNC_TAKING,
+    MODULE_ATTRS,
+    OPAQUE,
+    literal_func_spec_ok,
+    method_allowed,
+)
 
 __all__ = ["MODULES", "UnsafeCode", "run_statement", "validate_code"]
 
@@ -66,6 +73,39 @@ class UnsafeCode(FramelabError, ValueError):
     code = "unsafe_code"
 
 
+def _spec(node: ast.AST | None) -> Any:
+    """A call argument as a plain spec for the string-function check (see ops.policy)."""
+    if node is None:
+        return None
+    if isinstance(node, ast.Constant):
+        return node.value
+    if isinstance(node, ast.List):
+        return [_spec(e) for e in node.elts]
+    if isinstance(node, ast.Tuple):
+        return tuple(_spec(e) for e in node.elts)
+    if isinstance(node, ast.Dict):
+        return {i: _spec(v) for i, v in enumerate(node.values)}
+    np_ref = isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name)
+    if np_ref and node.value.id == "np":  # type: ignore[union-attr]
+        return FUNC_REF
+    return OPAQUE
+
+
+def _check_function_specs(node: ast.Call) -> None:
+    """apply/agg/transform look strings up as methods: the executed call must only name kernels
+    (a second line of defence behind op validation)."""
+    if not (isinstance(node.func, ast.Attribute) and node.func.attr in FUNC_TAKING):
+        return
+    keywords = {k.arg: k.value for k in node.keywords if k.arg is not None}
+    if any(k.arg is None for k in node.keywords):
+        raise UnsafeCode("keyword unpacking is not allowed in function-taking calls")
+    first = _spec(node.args[0]) if node.args else None
+    func = _spec(keywords.pop("func", None))
+    others = {k: _spec(v) for k, v in keywords.items()}
+    if not literal_func_spec_ok(node.func.attr, first, func, others):
+        raise UnsafeCode(f"{node.func.attr}() may only name pandas functions like 'sum'")
+
+
 def validate_code(code: str, readable: set[str], result: str) -> ast.Module:
     """Allow only the tiny subset framelab generates; only ``result`` may be assigned."""
     try:
@@ -83,6 +123,8 @@ def validate_code(code: str, readable: set[str], result: str) -> ast.Module:
     for node in ast.walk(tree):
         if not isinstance(node, _ALLOWED):
             raise UnsafeCode(f"{type(node).__name__} is not allowed in generated code")
+        if isinstance(node, ast.Call):
+            _check_function_specs(node)
         if isinstance(node, ast.Attribute) and node.attr.startswith("_"):
             raise UnsafeCode(f"private attribute {node.attr!r} is not allowed")
         if isinstance(node, ast.Attribute):

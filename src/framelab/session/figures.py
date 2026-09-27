@@ -32,6 +32,21 @@ __all__ = ["FigureDoc", "FigureStore", "UnknownFigure"]
 MAX_UNDO = 200
 
 
+def clean_exported(value: Any) -> dict[str, Any] | None:
+    """Export settings from a document, only when every field is what framelab writes."""
+    if not isinstance(value, dict):
+        return None
+    path, dpi = value.get("path"), value.get("dpi")
+    transparent, fmt = value.get("transparent", False), value.get("format")
+    if not isinstance(path, str) or not path.strip() or len(path) > 1000:
+        return None
+    if isinstance(dpi, bool) or not isinstance(dpi, int) or not 30 <= dpi <= 1200:
+        return None
+    if not isinstance(transparent, bool) or (fmt is not None and fmt not in catalog()["formats"]):
+        return None
+    return {"path": path, "dpi": dpi, "transparent": transparent, "format": fmt}
+
+
 class UnknownFigure(BadRequest):
     code = "unknown_figure"
 
@@ -135,17 +150,21 @@ class FigureStore:
         state["suggestions"] = self.suggest(source) if source else []
         return state
 
-    def restore(self, fid: str, spec: Any, exported: Any = None) -> None:
-        """Re-create a saved figure (documents); layers keep their node ids."""
+    def restore(self, fid: str, spec: Any, exported: Any = None) -> list[str]:
+        """Re-create a saved figure (documents); layers keep their node ids. Returns warnings."""
+        warnings = []
         with self._lock:
             if fid in self._docs:
                 raise FigureSpecError(f"figure id {fid!r} already exists")
             doc = FigureDoc(fid, normalize(spec, set(self._session.node_ids())))
-            doc.exported = exported if isinstance(exported, dict) else None
+            doc.exported = clean_exported(exported)
+            if exported is not None and doc.exported is None:
+                warnings.append(f"figure {fid!r}: ignored its export settings (not valid)")
             self._docs[fid] = doc
             if fid.startswith("f") and fid[1:].isdigit():
                 self._next = max(self._next, int(fid[1:]) + 1)
             self._changed(doc)
+        return warnings
 
     def update(self, fid: str, spec: Any) -> dict[str, Any]:
         with self._lock:
@@ -264,7 +283,7 @@ class FigureStore:
         code, _ = self._code(doc, timeout)
         savefig = None
         if exported:
-            args = [emit_literal(exported["path"]), f"dpi={exported['dpi']}"]
+            args = [emit_literal(str(exported["path"])), f"dpi={int(exported['dpi'])}"]
             if exported.get("transparent"):
                 args.append("transparent=True")
             savefig = f"{code.fig_var}.savefig({', '.join(args)})"

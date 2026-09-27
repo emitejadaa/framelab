@@ -18,6 +18,7 @@ __all__ = [
     "MAX_NAME",
     "OP_ALIASES",
     "auto_node_name",
+    "clean_source_expr",
     "op_alias",
     "RESERVED_NAMES",
     "RootSpec",
@@ -131,6 +132,18 @@ def _is_simple_access(expr: ast.expr) -> bool:
             return False
         expr = expr.value
     return isinstance(expr, ast.Name)
+
+
+def clean_source_expr(text: object) -> str | None:
+    """``text`` normalised when it is a plain variable access (``dfs[0]``, ``data.ventas``),
+    else None: a document may only record how a root was reached, never other code."""
+    if not isinstance(text, str) or len(text) > 200:
+        return None
+    try:
+        tree = ast.parse(text, mode="eval")
+    except SyntaxError:
+        return None
+    return ast.unparse(tree.body) if _is_simple_access(tree.body) else None
 
 
 def _name_for_expr(expr: ast.expr) -> tuple[str, str | None]:

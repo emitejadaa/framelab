@@ -13,7 +13,7 @@ import pandas as pd
 from .. import __version__
 from ..codegen.literals import label_text
 from ..errors import FramelabError
-from ..naming import RootSpec
+from ..naming import RootSpec, clean_source_expr, sanitize_identifier
 from ..ops import op_from_json, op_to_json
 from ..options import OptionsRegistry
 from .core import Session
@@ -112,6 +112,10 @@ def from_document(
     doc = _migrate(doc)
     entries = doc["graph"]["nodes"]
     root_entries = [e for e in entries if "source" in e]
+    for entry in root_entries:
+        name = entry.get("name")
+        if not isinstance(name, str) or sanitize_identifier(name) != name:
+            raise DocumentError(f"invalid variable name {name!r} in the document")
     missing = [e["name"] for e in root_entries if e["name"] not in roots]
     if missing:
         raise DocumentError(f"missing data for: {', '.join(missing)}")
@@ -121,7 +125,13 @@ def from_document(
         obj = roots[entry["name"]]
         if schema_hash(obj) != entry["source"]["schema_hash"]:
             warnings.append(f"{entry['name']}: columns or dtypes changed since the file was saved")
-        specs.append(RootSpec(entry["name"], obj, entry["source"].get("source_expr")))
+        recorded = entry["source"].get("source_expr")
+        source_expr = clean_source_expr(recorded) if recorded is not None else None
+        if recorded is not None and source_expr is None:
+            warnings.append(
+                f"{entry['name']}: ignored its recorded source (only a variable access is allowed)"
+            )
+        specs.append(RootSpec(entry["name"], obj, source_expr))
     session = Session(specs, options)
     expected = [e["id"] for e in root_entries]
     actual = [n.id for n in session.nodes()]
@@ -140,7 +150,7 @@ def from_document(
             warnings.append(f"{entry['name']} was renamed to {session.node(entry['id']).name}")
     for item in (doc.get("figures") or {}).get("items", []):
         try:
-            session.plots.restore(item["id"], item["spec"], item.get("exported"))
+            warnings.extend(session.plots.restore(item["id"], item["spec"], item.get("exported")))
         except (FramelabError, KeyError, TypeError) as exc:
             warnings.append(f"figure {item.get('id')!r} could not be restored: {exc}")
     return session, warnings

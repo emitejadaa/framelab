@@ -8,7 +8,7 @@ from typing import Any, Literal
 
 import pandas as pd
 
-from .policy import ALLOWED_PD_FUNCS, FUNC_TAKING, str_funcs_ok
+from .policy import ALLOWED_PD_FUNCS, FUNC_TAKING, func_spec_ok
 from .values import (
     ACCESSORS,
     EXPR_TYPES,
@@ -69,11 +69,10 @@ class Op:
         return tuple(dict.fromkeys(refs))
 
     def _check_string_funcs(self) -> None:
-        """apply/agg/transform look strings up as methods: only pandas kernels may pass."""
-        candidates = [a for a in self.args[:1]] + [v for k, v in self.kwargs if k == "func"]
-        for v in candidates:
-            if not str_funcs_ok(_plain(v), dict_values=self.name != "apply"):
-                raise OpError(f"{self.name}() may only name pandas functions like 'sum' or 'mean'")
+        """apply/agg/transform look strings up as methods: only pandas kernels may pass
+        (first argument, ``func=``, lists and dicts inside them, and named aggregations)."""
+        if not func_spec_ok(self.name, self.args, self.kwargs):
+            raise OpError(f"{self.name}() may only name pandas functions like 'sum' or 'mean'")
 
     def validate(self) -> Op:
         if self.kind not in OP_KINDS:
@@ -112,12 +111,6 @@ class Op:
         ):
             raise OpError("setitem needs a column label and a value expression")
         return self
-
-
-def _plain(v: Value) -> Any:
-    from .values import Lit
-
-    return v.value if isinstance(v, Lit) else None
 
 
 def op_to_json(op: Op) -> dict[str, Any]:

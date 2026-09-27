@@ -67,7 +67,7 @@ def check_method(name: str) -> str:
 
 def check_value(v: Any) -> Any:
     """Enforce the policy on every function reference and inline method call inside ``v``."""
-    from .policy import ALLOWED_STR_FUNCS, np_func_allowed
+    from .policy import ALLOWED_STR_FUNCS, func_spec_ok, np_func_allowed
 
     if isinstance(v, Func):
         allowed = np_func_allowed(v.name) if v.ns == "np" else v.name in ALLOWED_STR_FUNCS
@@ -75,6 +75,8 @@ def check_value(v: Any) -> Any:
             raise OpError(f"function {v.name!r} is not allowed")
     elif isinstance(v, CallE):
         check_method(v.name)
+        if not func_spec_ok(v.name, v.args, v.kwargs):
+            raise OpError(f"{v.name}() may only name pandas functions like 'sum' or 'mean'")
         check_value(v.base)
         for a in v.args:
             check_value(a)

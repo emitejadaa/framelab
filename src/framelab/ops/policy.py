@@ -16,6 +16,10 @@ __all__ = [
     "ALLOWED_STR_FUNCS",
     "FUNC_TAKING",
     "MODULE_ATTRS",
+    "FUNC_REF",
+    "OPAQUE",
+    "func_spec_ok",
+    "literal_func_spec_ok",
     "method_allowed",
     "np_func_allowed",
 ]
@@ -199,3 +203,84 @@ def str_funcs_ok(value: Any, *, dict_values: bool) -> bool:
     if isinstance(value, dict) and dict_values:
         return all(str_funcs_ok(v, dict_values=dict_values) for v in value.values())
     return True
+
+
+# Options of agg/aggregate that are not named aggregations (their strings are not functions).
+AGG_OPTIONS = frozenset(
+    {"axis", "engine", "engine_kwargs", "numeric_only", "min_count", "skipna", "ddof", "dropna"}
+)
+
+
+class _Opaque:
+    """A value only known at run time (an expression, a column, a node): never a safe spec."""
+
+
+class _FuncRef:
+    """A function passed by reference (``np.log``, a checked kernel name)."""
+
+
+OPAQUE, FUNC_REF = _Opaque(), _FuncRef()
+
+
+def _spec_ok(value: Any, dict_values: bool) -> bool:
+    if value is OPAQUE:
+        return False
+    if isinstance(value, str):
+        return value in ALLOWED_STR_FUNCS
+    if isinstance(value, (list, tuple)):
+        return all(_spec_ok(v, dict_values) for v in value)
+    if isinstance(value, dict):
+        return dict_values and all(_spec_ok(v, dict_values) for v in value.values())
+    return True  # numbers, None, FUNC_REF
+
+
+def _named_ok(value: Any) -> bool:
+    """A named aggregation value: ``("column", func)`` or a bare ``func``."""
+    if isinstance(value, tuple) and len(value) == 2 and value[0] is not OPAQUE:
+        return _spec_ok(value[1], True)
+    return _spec_ok(value, True)
+
+
+def literal_func_spec_ok(
+    name: str, first: Any, func_kwarg: Any, other_kwargs: dict[str, Any]
+) -> bool:
+    """Whether the function specs given to apply/agg/aggregate/transform only name pandas
+    kernels. Specs are plain values where ``OPAQUE`` marks anything computed at run time.
+
+    ``first`` is the first positional argument, ``func_kwarg`` the ``func=`` keyword (``None``
+    when absent) and ``other_kwargs`` the other keywords (named aggregations for agg).
+    """
+    if name not in FUNC_TAKING:
+        return True
+    dict_values = name != "apply"
+    if not (_spec_ok(first, dict_values) and _spec_ok(func_kwarg, dict_values)):
+        return False
+    if name in ("agg", "aggregate"):
+        return all(_named_ok(v) for k, v in other_kwargs.items() if k not in AGG_OPTIONS)
+    return True
+
+
+def _plain(v: Any) -> Any:
+    """An op value as a plain spec: literals as they are, lists/dicts recursively, function
+    references as FUNC_REF and everything computed at run time as OPAQUE."""
+    from .values import DictV, Func, ListV, Lit
+
+    if isinstance(v, Lit):
+        return v.value
+    if isinstance(v, Func):
+        return FUNC_REF  # checked by check_value
+    if isinstance(v, ListV):
+        return [_plain(i) for i in v.items]
+    if isinstance(v, DictV):
+        return {repr(k): _plain(x) for k, x in v.items}
+    return OPAQUE
+
+
+def func_spec_ok(name: str, args: Any, kwargs: Any) -> bool:
+    """``literal_func_spec_ok`` for op values (positional ``args``, ``(key, value)`` kwargs)."""
+    if name not in FUNC_TAKING:
+        return True
+    kw = dict(kwargs)
+    first = _plain(args[0]) if args else None
+    func = _plain(kw.pop("func")) if "func" in kw else None
+    return literal_func_spec_ok(name, first, func, {k: _plain(v) for k, v in kw.items()})
