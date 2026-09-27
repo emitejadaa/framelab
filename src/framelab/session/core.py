@@ -27,7 +27,7 @@ from ..ops import Op, remap_op
 from ..options import OptionsRegistry
 from ..options import registry as default_registry
 from ..protocol.schema import SessionSnapshot
-from .figures import FigureStore
+from .figures import Dropped, FigureStore
 from .history import Change, History, NodeRecord
 from .node import ErrorDetail, Node, NodeError, NodeState, NotReady, UnknownNode, classify
 
@@ -237,11 +237,11 @@ class Session:
             names = self.variable_names()
             if name is None:
                 trail = self._trail(op.target) if op.target else ()
-                final, auto = auto_node_name(op, names, self._by_name, trail), True
+                final, auto = auto_node_name(op, names, self._taken_names(), trail), True
             else:
                 final, auto = sanitize_identifier(name), False
-                if final in self._by_name:
-                    raise ValueError(f"a node called {final!r} already exists")
+                if final in self._taken_names():
+                    raise NameTaken(f"{final!r} is already used by a node or a figure")
             node = Node(
                 id=self._take_id(node_id),
                 name=final,
@@ -278,7 +278,7 @@ class Session:
             final = (
                 sanitize_identifier(name)
                 if name
-                else auto_node_name(op, names, self._by_name, trail)
+                else auto_node_name(op, names, self._taken_names(), trail)
             )
         style = self.code_style()
         return {
@@ -286,6 +286,10 @@ class Session:
             "code": restyle(render_op(op, final, names, style).display, style),
             "label": op_label(op, names),
         }
+
+    def _taken_names(self) -> set[str]:
+        """Node and figure names share one namespace: both become variables in the code."""
+        return set(self._by_name) | self.plots.names()
 
     def _trail(self, nid: str) -> tuple[str, ...]:
         """(root name, alias, alias, …) along the first-parent chain of ``nid``."""
@@ -311,7 +315,7 @@ class Session:
             if node.is_root:
                 raise CannotRename(f"{node.name} is your own variable: rename it in your code")
             final = sanitize_identifier(new_name)
-            taken = (set(self._by_name) | self.plots.names()) - {node.name}
+            taken = self._taken_names() - {node.name}
             if final in taken:
                 raise NameTaken(f"{final!r} is already used")
             changes: list[tuple[str, str, bool, str, bool]] = []
@@ -327,7 +331,7 @@ class Session:
                     child.label = label
                     touched.add(d)
                 if child.name_auto:
-                    others = (set(self._by_name) | self.plots.names()) - {child.name}
+                    others = self._taken_names() - {child.name}
                     target = child.op.target  # type: ignore[union-attr]
                     trail = self._trail(target) if target else ()
                     fresh = auto_node_name(child.op, names, others, trail)
@@ -384,7 +388,7 @@ class Session:
             if replay:
                 for d in self.descendants(original.id)[1:]:
                     child = self.node(d)
-                    taken = set(self.names) | self.plots.names()
+                    taken = self._taken_names()
                     wanted = None if child.name_auto else unique_name(child.name, taken)
                     new_op = remap_op(child.op, mapping)  # type: ignore[arg-type]
                     mapping[d] = self.apply(new_op, name=wanted, force=child.force).id
@@ -411,6 +415,11 @@ class Session:
 
     def delete(self, *keys: str) -> dict[str, Any]:
         """Remove nodes and all their descendants (roots are the input data and stay)."""
+        ids, records, dropped = self._delete(keys)
+        self._record(Change("delete", nodes=records, figures=dropped))
+        return {"ids": ids, "figures": list(dropped)}
+
+    def _delete(self, keys: tuple[str, ...]) -> tuple[list[str], list[NodeRecord], Dropped]:
         with self._lock:
             starts = [self._resolve(k) for k in keys]
             for nid in starts:
@@ -433,14 +442,7 @@ class Session:
                     future.cancel()
             self.rev += 1
         self._emit("node.deleted", {"ids": ids})
-        before = {
-            f["id"]: self.plots.get(f["id"])["spec"]
-            for f in self.plots.infos()
-            if set(f["sources"]) & doomed
-        }
-        figures = self.plots.drop_sources(set(ids))
-        self._record(Change("delete", nodes=records, figures=[(f, before[f]) for f in figures]))
-        return {"ids": ids, "figures": figures}
+        return ids, records, self.plots.drop_sources(set(ids))
 
     # ---- history ------------------------------------------------------------------------------
     @staticmethod
@@ -503,11 +505,10 @@ class Session:
 
     def _revert(self, change: Change) -> None:
         if change.kind == "create":
-            self._drop([r.id for r in change.nodes])
+            change.figures = self._drop([r.id for r in change.nodes])
         elif change.kind == "delete":
             self._restore(change.nodes)
-            for fid, spec in change.figures:
-                self.plots.set_spec(fid, spec)
+            self.plots.put_back(change.figures)
         else:
             for nid, old, old_auto, _new, _auto in reversed(change.names):
                 self._rename_to(nid, old, old_auto)
@@ -515,22 +516,22 @@ class Session:
     def _reapply(self, change: Change) -> None:
         if change.kind == "create":
             self._restore(change.nodes)
+            self.plots.put_back(change.figures)  # layers the undo took away with the nodes
         elif change.kind == "delete":
-            self._drop([r.id for r in change.nodes])
+            change.figures = self._drop([r.id for r in change.nodes])
         else:
             for nid, _old, _old_auto, new, auto in change.names:
                 self._rename_to(nid, new, auto)
 
-    def _drop(self, ids: list[str]) -> None:
+    def _drop(self, ids: list[str]) -> Dropped:
         existing = [i for i in ids if i in self._nodes]
-        if existing:
-            self.delete(*existing)
+        return self._delete(tuple(existing))[2] if existing else {}
 
     def _restore(self, records: list[NodeRecord]) -> None:
         for r in records:
             if r.id in self._nodes:
                 continue
-            free = r.name not in self._by_name
+            free = r.name not in self._taken_names()
             node = self.apply(r.op, name=r.name if free else None, node_id=r.id, force=r.force)
             with self._lock:
                 node.name_auto = r.name_auto
@@ -540,8 +541,8 @@ class Session:
             node = self._nodes.get(nid)
             if node is None:
                 return
-            if self._by_name.get(name, nid) != nid:
-                name = unique_name(name, set(self._by_name))
+            if self._by_name.get(name, nid) != nid or name in self.plots.names():
+                name = unique_name(name, self._taken_names() - {node.name})
             self._set_name(node, name, auto)
             names = self.variable_names()
             touched = [node]

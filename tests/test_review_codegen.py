@@ -80,7 +80,9 @@ def test_query_refuses_control_characters(text):
     assert to_query(gt(col(text), 1)) is None
 
 
-@pytest.mark.parametrize("label", ["Total\n(EUR)", "Importe\r\nneto", 'x\nprint("RAN FROM HEADER")\n#'])
+@pytest.mark.parametrize(
+    "label", ["Total\n(EUR)", "Importe\r\nneto", 'x\nprint("RAN FROM HEADER")\n#']
+)
 def test_exported_headers_stay_comments(label):
     frame = pd.DataFrame({label: [1, 2], "b": [3, 4]})
     s = session(frame)
@@ -100,7 +102,9 @@ def test_assign_style_with_a_method_valued_formula_stays_faithful():
     frame = pd.DataFrame({"precio": [1.0, 2.0]})
     s = session(frame, code__column_assign="assign")
     try:
-        node = s.apply(Op("setitem", "n1", key="total", expr=AttrE(GetCol(This(), "precio"), "sum")))
+        node = s.apply(
+            Op("setitem", "n1", key="total", expr=AttrE(GetCol(This(), "precio"), "sum"))
+        )
         value = s.wait(node.id)
         result = run(s.code(node.id), frame)[node.name]
         assert list(result.columns) == list(value.columns)

@@ -27,7 +27,8 @@ class NodeRecord:
 class Change:
     kind: str  # create | delete | rename
     nodes: list[NodeRecord] = field(default_factory=list)
-    figures: list[tuple[str, dict[str, Any]]] = field(default_factory=list)  # specs before
+    # figure id -> [(axes, layer index, layer)] removed with the nodes (put back on undo)
+    figures: dict[str, list[tuple[int, int, dict[str, Any]]]] = field(default_factory=dict)
     names: list[tuple[str, str, bool, str, bool]] = field(default_factory=list)
 
 

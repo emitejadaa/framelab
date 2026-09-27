@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import ast
 import contextlib
+import datetime
+import decimal
 import struct
 import threading
 import warnings
@@ -22,8 +24,17 @@ from matplotlib.figure import Figure
 from ..errors import FramelabError
 from ..ops.policy import MODULE_ATTRS, method_allowed
 from .codegen import FigureCode
+from .spec import FigureSpecError
 
-__all__ = ["PREVIEW_ROWS", "PlotCodeError", "Rendered", "build", "png_bytes", "validate_plot_code"]
+__all__ = [
+    "PREVIEW_ROWS",
+    "PlotCodeError",
+    "Rendered",
+    "build",
+    "drawing",
+    "png_bytes",
+    "validate_plot_code",
+]
 
 PREVIEW_ROWS = 20_000
 RENDER_LOCK = threading.RLock()  # rcParams and style contexts are process-global
@@ -112,15 +123,28 @@ def style_context(style: str) -> Iterator[None]:
                 yield
 
 
-def _preview_rows(limit: int | None, flag: list[bool]) -> Callable[[Any, str], Any]:
-    def preview_rows(data: Any, how: str) -> Any:
+@contextlib.contextmanager
+def drawing() -> Iterator[None]:
+    """Matplotlib fails while drawing (bad mathtext in a title, huge images…): a figure error."""
+    try:
+        yield
+    except (ValueError, RuntimeError, OverflowError, TypeError, KeyError) as exc:
+        raise FigureSpecError(f"cannot draw the figure: {exc}") from None
+
+
+def _preview_rows(limit: int | None, flag: list[bool]) -> Callable[..., Any]:
+    def preview_rows(data: Any, how: str, by: Any = None) -> Any:
         if limit is None or len(data) <= limit:
             return data
         flag.append(True)
         if how == "sample":
             return data.sample(n=limit, random_state=0).sort_index()
         step = -(-len(data) // limit)
-        return data.iloc[::step]
+        if by is None:
+            return data.iloc[::step]
+        # every group keeps its own stride, so interleaved groups (split by) all survive
+        nth = data.groupby(by, sort=False, dropna=False).cumcount().to_numpy()
+        return data.iloc[np.flatnonzero(nth % step == 0)]
 
     return preview_rows
 
@@ -147,6 +171,8 @@ def build(
         "pd": pd,
         "np": np,
         "Figure": Figure,
+        "datetime": datetime,  # column labels that are dates or decimals
+        "decimal": decimal,
         "str": str,
         "_preview_rows": _preview_rows(preview_limit, sampled),
         **env,

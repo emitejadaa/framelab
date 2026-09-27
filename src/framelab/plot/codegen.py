@@ -89,7 +89,7 @@ class _Gen:
         suffix = self.fig[4:] if self.fig.startswith("fig_") else ""
         grid = spec["nrows"] * spec["ncols"] > 1
         self.axvar = self.fresh(("axs" if grid else "ax") + (f"_{suffix}" if suffix else ""))
-        self.preps: dict[str, str] = {}  # prep code -> variable
+        self.preps: dict[str, tuple[str, Block]] = {}  # prep code -> (variable, its block)
         self.previews = 0
 
     def fresh(self, base: str) -> str:
@@ -213,10 +213,12 @@ class _Gen:
             else:
                 mask = f"{col} {op} {_lit(decode_scalar(rows['value']))}"
             code = f"{name}[{mask}]"
-        var = self.preps.get(code)
-        if var is not None:
+        known = self.preps.get(code)
+        if known is not None:
+            var, block = known
+            block.users.append(pos)  # if the shared selection fails, this layer fails too
             return var, None
-        var = self.preps[code] = self.fresh(f"{name}_plot")
+        var = self.fresh(f"{name}_plot")
         line = f"{var} = {code}"
         return var, Block("prep", [line], [line], users=[pos])
 
@@ -239,23 +241,36 @@ class _Gen:
             raise LayerError("choose a column for x")
         blocks: list[Block] = []
         data, prep = self.rows(layer, name, value, (k, j))
+        try:
+            display, executed = self.draw(k, data, value, layer, ys, legend)
+        except LayerError:
+            if prep is not None:
+                self.taken.discard(data)  # the selection was never emitted
+            raise
         if prep is not None:
+            self.preps[prep.display[0].split(" = ", 1)[1]] = (data, prep)
             blocks.append(prep)
+        blocks.append(Block("layer", display, executed, axes=k, layer=j))
+        return blocks
+
+    def draw(
+        self, k: int, data: str, value: Any, layer: dict, ys: list, legend: bool
+    ) -> tuple[list[str], list[str]]:
         emit = getattr(self, f"_{layer['kind']}")
         before = set(self.taken)
         display = emit(self.axes_expr(k), data, value, layer, ys, legend)
-        executed = display
-        if layer["kind"] in PER_POINT:
-            # same helper names as the displayed code; only the data variable differs
-            after, self.taken = self.taken, before
-            preview = f"_preview_{self.previews}"
-            self.previews += 1
-            how = "sample" if layer["kind"] == "scatter" else "stride"
-            executed = [f"{preview} = _preview_rows({data}, {_lit(how)})"]
-            executed += emit(self.axes_expr(k), preview, value, layer, ys, legend)
-            self.taken = after | self.taken
-        blocks.append(Block("layer", display, executed, axes=k, layer=j))
-        return blocks
+        if layer["kind"] not in PER_POINT:
+            return display, display
+        # same helper names as the displayed code; only the data variable differs
+        after, self.taken = self.taken, before
+        preview = f"_preview_{self.previews}"
+        self.previews += 1
+        how = "sample" if layer["kind"] == "scatter" else "stride"
+        by = f", {_lit(decode_ref(layer['hue'])[1])}" if layer["hue"] is not None else ""
+        executed = [f"{preview} = _preview_rows({data}, {_lit(how)}{by})"]
+        executed += emit(self.axes_expr(k), preview, value, layer, ys, legend)
+        self.taken = after | self.taken
+        return display, executed
 
     def props(self, layer: dict, skip: tuple[str, ...] = ()) -> list[str]:
         kind = KINDS[layer["kind"]]
@@ -315,7 +330,7 @@ class _Gen:
         if layer["hue"] is not None:
             head, key, group = self.loop(d, layer)
             args = [self.axis(group, x, value, categorical=False), self.expr(group, y)]
-            size = self.size(group, layer)
+            size = self.size(group, layer, scale=d)  # one scale for every group
             label = [f"label={key}"] if legend else []
             props = [a for a in props if not (size and a.startswith("s="))]
             return [head, INDENT + self.call(f"{ax}.scatter", args + size + label + props)]
@@ -338,12 +353,13 @@ class _Gen:
             return [f"{var} = {call}", f"{self.fig}.colorbar({var}, ax={ax}{label})"]
         return [call]
 
-    def size(self, d: str, layer: dict) -> list[str]:
+    def size(self, d: str, layer: dict, scale: str | None = None) -> list[str]:
         if layer["size_by"] is None:
             return []
         col = self.expr(d, layer["size_by"])
+        biggest = self.expr(scale or d, layer["size_by"])
         top = layer["props"].get("size_max", 200.0)
-        return [f"s={col} / {col}.max() * {top:g}"]
+        return [f"s={col} / {biggest}.max() * {top:g}"]
 
     def _bar(self, ax: str, d: str, value: Any, layer: dict, ys: list, legend: bool) -> list[str]:
         return self._bars(ax, "bar", d, value, layer, ys, legend)

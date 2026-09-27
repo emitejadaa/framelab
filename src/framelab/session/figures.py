@@ -13,11 +13,11 @@ from ..codegen.literals import emit_literal
 from ..codegen.script import pipeline_lines, used_modules
 from ..codegen.style import import_lines, restyle
 from ..errors import BadRequest
-from ..naming import unique_name
+from ..naming import sanitize_identifier, unique_name
 from ..plot.codegen import FigureCode, generate
 from ..plot.fields import default_layer, fields, suggestions
 from ..plot.kinds import KINDS, catalog
-from ..plot.render import PREVIEW_ROWS, build, png_bytes, style_context
+from ..plot.render import PREVIEW_ROWS, build, drawing, png_bytes, style_context
 from ..plot.spec import FigureSpecError, normalize
 from .node import NodeError, NotReady, UnknownNode
 from .paths import output_path
@@ -27,9 +27,12 @@ if TYPE_CHECKING:
 
     from .core import Session
 
-__all__ = ["FigureDoc", "FigureStore", "UnknownFigure"]
+__all__ = ["Dropped", "FigureDoc", "FigureStore", "UnknownFigure"]
 
 MAX_UNDO = 200
+
+# Layers removed because their node was deleted: figure id -> [(axes index, layer index, layer)].
+Dropped = dict[str, list[tuple[int, int, dict[str, Any]]]]
 
 
 def clean_exported(value: Any) -> dict[str, Any] | None:
@@ -96,7 +99,8 @@ class FigureStore:
         self._session = session
         self._docs: dict[str, FigureDoc] = {}
         self._next = 1
-        self._lock = threading.RLock()
+        # the session's own lock: one lock order, whichever side calls the other
+        self._lock: threading.RLock = session._lock
 
     # ---- lookup ---------------------------------------------------------------------------------
     def _doc(self, fid: str) -> FigureDoc:
@@ -130,9 +134,20 @@ class FigureStore:
             return self._doc(fid).state()
 
     def _taken(self, exclude: str | None = None) -> set[str]:
-        names = set(self._session.names)
+        names = set(self._session.variable_names().values())
         names.update(d.spec["name"] for d in self._docs.values() if d.id != exclude)
         return names
+
+    def _live(self, doc: FigureDoc, spec: dict[str, Any]) -> dict[str, Any]:
+        """A spec from the figure's history as it can be shown now: layers whose node was
+        deleted are left out, and a name another node or figure took since gets a suffix."""
+        ids = set(self._session.node_ids())
+        spec = {**spec, "axes": [
+            {**axes, "layers": [ly for ly in axes["layers"] if ly["source"] in ids]}
+            for axes in spec["axes"]
+        ]}  # fmt: skip
+        spec["name"] = unique_name(spec["name"], self._taken(exclude=doc.id))
+        return normalize(spec, ids)
 
     def _changed(self, doc: FigureDoc) -> dict[str, Any]:
         self._session.rev += 1
@@ -146,7 +161,7 @@ class FigureStore:
             node = self._session.node(source)
             source, base = node.id, f"fig_{node.name}"
         with self._lock:
-            final = unique_name(name or base, self._taken())
+            final = unique_name(sanitize_identifier(name or base, fallback="fig"), self._taken())
             fid = f"f{self._next}"
             self._next += 1
             spec = normalize({"name": final}, set())
@@ -162,6 +177,10 @@ class FigureStore:
             if fid in self._docs:
                 raise FigureSpecError(f"figure id {fid!r} already exists")
             doc = FigureDoc(fid, normalize(spec, set(self._session.node_ids())))
+            name = unique_name(doc.spec["name"], self._taken())
+            if name != doc.spec["name"]:
+                warnings.append(f"figure {doc.spec['name']!r} was renamed {name!r} (name in use)")
+                doc.spec["name"] = name
             doc.exported = clean_exported(exported)
             if exported is not None and doc.exported is None:
                 warnings.append(f"figure {fid!r}: ignored its export settings (not valid)")
@@ -191,7 +210,7 @@ class FigureStore:
             doc = self._doc(fid)
             if doc.undo:
                 doc.redo.append(doc.spec)
-                doc.spec = doc.undo.pop()
+                doc.spec = self._live(doc, doc.undo.pop())
                 doc.version += 1
                 return self._changed(doc)
             return doc.state()
@@ -201,20 +220,39 @@ class FigureStore:
             doc = self._doc(fid)
             if doc.redo:
                 doc.undo.append(doc.spec)
-                doc.spec = doc.redo.pop()
+                doc.spec = self._live(doc, doc.redo.pop())
                 doc.version += 1
                 return self._changed(doc)
             return doc.state()
 
-    def set_spec(self, fid: str, spec: dict[str, Any]) -> None:
-        """Put back a spec (graph undo); the figure's own history is not touched."""
+    def put_back(self, dropped: Dropped) -> list[str]:
+        """Graph undo: layers removed with their nodes go back where they were, on top of any
+        later edit. It is a step of each figure's own history. Returns the figures changed."""
+        changed = []
         with self._lock:
-            doc = self._docs.get(fid)
-            if doc is None:
-                return
-            doc.spec = normalize(spec, set(self._session.node_ids()))
-            doc.version += 1
+            ids = set(self._session.node_ids())
+            for fid, entries in dropped.items():
+                doc = self._docs.get(fid)
+                if doc is None:
+                    continue
+                spec = copy.deepcopy(doc.spec)
+                for k, j, layer in sorted(entries, key=lambda e: (e[0], e[1])):
+                    if layer["source"] not in ids:
+                        continue
+                    layers = spec["axes"][min(k, len(spec["axes"]) - 1)]["layers"]
+                    layers.insert(min(j, len(layers)), copy.deepcopy(layer))
+                new = normalize(spec, ids)
+                if new == doc.spec:
+                    continue
+                doc.undo.append(doc.spec)
+                del doc.undo[:-MAX_UNDO]
+                doc.redo.clear()
+                doc.spec = new
+                doc.version += 1
+                changed.append(doc)
+        for doc in changed:
             self._changed(doc)
+        return [d.id for d in changed]
 
     def delete(self, fid: str) -> None:
         with self._lock:
@@ -223,25 +261,34 @@ class FigureStore:
             self._session.rev += 1
         self._session._emit("figure.deleted", {"id": doc.id})
 
-    def drop_sources(self, ids: set[str]) -> list[str]:
-        """Remove layers drawing deleted nodes; returns the figures that changed."""
+    def drop_sources(self, ids: set[str]) -> Dropped:
+        """Remove layers drawing deleted nodes; returns what was removed from each figure.
+
+        The figures' histories keep them: undo and redo leave out layers whose node is gone,
+        and bring them back if the node is restored (node ids are never reused)."""
+        dropped: Dropped = {}
         changed = []
         with self._lock:
             for doc in self._docs.values():
-                if not ids & set(doc.sources()):
+                removed = [
+                    (k, j, layer)
+                    for k, axes in enumerate(doc.spec["axes"])
+                    for j, layer in enumerate(axes["layers"])
+                    if layer["source"] in ids
+                ]
+                if not removed:
                     continue
+                dropped[doc.id] = removed
                 spec = {**doc.spec, "axes": [
                     {**axes, "layers": [ly for ly in axes["layers"] if ly["source"] not in ids]}
                     for axes in doc.spec["axes"]
                 ]}  # fmt: skip
-                doc.undo.clear()  # history would point at deleted nodes
-                doc.redo.clear()
                 doc.spec = normalize(spec, set(self._session.node_ids()))
                 doc.version += 1
                 changed.append(doc)
         for doc in changed:
             self._changed(doc)
-        return [d.id for d in changed]
+        return dropped
 
     # ---- data -----------------------------------------------------------------------------------
     def fields(self, node: str, timeout: float = 30.0) -> dict[str, Any]:
@@ -341,7 +388,8 @@ class FigureStore:
             dpi = max(10.0, min(300.0, fit * max(0.5, min(dpr, 2.0))))
         with style_context(spec["style"]):
             _, out = self._build(doc, timeout, PREVIEW_ROWS)
-            png, width, height = png_bytes(out.figure, dpi)
+            with drawing():
+                png, width, height = png_bytes(out.figure, dpi)
         meta = {
             "id": doc.id,
             "version": version,
@@ -359,7 +407,8 @@ class FigureStore:
             doc = self._doc(fid)
         with style_context(doc.spec["style"]):
             _, out = self._build(doc, timeout, None)
-            out.figure.canvas.draw()
+            with drawing():
+                out.figure.canvas.draw()
         return out.figure
 
     def export(
@@ -387,7 +436,8 @@ class FigureStore:
             if out.errors:
                 first = next(iter(out.errors.values()))
                 raise FigureSpecError(f"fix the layers with errors before exporting ({first})")
-            out.figure.savefig(buffer, format=fmt, dpi=dpi, transparent=transparent)
+            with drawing():
+                out.figure.savefig(buffer, format=fmt, dpi=dpi, transparent=transparent)
         data = buffer.getvalue()
         meta: dict[str, Any] = {"format": fmt, "bytes": len(data), "path": None}
         if target is not None:
