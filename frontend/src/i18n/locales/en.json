@@ -416,7 +416,7 @@
   "member": {
     "required": "required",
     "default": "default: {{value}}",
-    "help": "Only the parameters you fill in are passed; the rest stay as in pandas.",
+    "help": "Only the parameters you fill in are passed; the rest stay as in pandas. Text in quotes (\"1\" or '1') is passed as text, not as a number.",
     "missing": "Fill in “{{name}}”",
     "bad_number": "“{{name}}” must be a number",
     "frame_none": "— choose a table —"

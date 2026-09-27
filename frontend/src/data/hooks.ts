@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { RpcError } from "../transport/rpc";
 import { useRpc } from "./rpcContext";
-import { type DecodedWindow, decodeWindow, type WindowMeta } from "./window";
+import { type DecodedWindow, decodeWindow, type WindowMeta, type WindowSort } from "./window";
 
 export interface ColumnInfo {
   text: string;
@@ -58,10 +58,7 @@ export function useSummary(id: string | null, version: string): Loadable<Summary
   return state;
 }
 
-export interface WindowSort {
-  column: number;
-  ascending: boolean;
-}
+export type { WindowSort } from "./window";
 
 /** A decoded Arrow row window for a node; ``sort`` orders it for viewing only. */
 export function useWindow(

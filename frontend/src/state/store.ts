@@ -60,6 +60,10 @@ export interface AppState {
 
 export type AppStore = ReturnType<typeof createAppStore>;
 
+/** A modal dialog is open: view shortcuts (undo, delete, rename) must not act behind it. */
+export const dialogOpen = (s: AppState): boolean =>
+  s.deleting !== null || s.renaming !== null || s.form !== null || s.browser !== null || s.memberForm !== null;
+
 /** One store per mounted UI (never a module singleton: two widgets can share a page). */
 export function createAppStore() {
   return createStore<AppState>()((set) => ({

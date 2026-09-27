@@ -21,6 +21,8 @@ interface Menu {
   column: number;
   row?: number;
   text?: string | null;
+  /** the view order of the rows the cell was read from */
+  sort?: WindowSort | null;
 }
 
 export function TableView({ nodeId }: { nodeId: string }) {
@@ -41,10 +43,12 @@ export function TableView({ nodeId }: { nodeId: string }) {
   if (!node) return null;
   const total = win.data?.meta.nrows_total ?? node.shape?.[0] ?? 0;
   const last = Math.max(0, Math.floor((total - 1) / PAGE) * PAGE);
-  const series = node.kind === "Series";
+  const index = node.kind === "Index";
+  const series = node.kind === "Series" || index; // one column: the node itself, no labels
   const columns = summary.data?.columns ?? [];
   const label = (column: number) => columns[column]?.label as Json;
-  const columnText = (column: number) => columns[column]?.text ?? "";
+  const shown = win.data?.meta;
+  const columnText = (column: number) => columns[column]?.text ?? shown?.columns[column - shown.col_start]?.text ?? "";
 
   const cycleSort = (column: number) => {
     setOffset(0);
@@ -71,11 +75,15 @@ export function TableView({ nodeId }: { nodeId: string }) {
     if (!sort) return null;
     const kwargs: b.Kwargs = series ? [] : [["by", b.colRef(label(sort.column))]];
     kwargs.push(["ascending", b.lit(sort.ascending)]);
+    // The view sorts stably, so ties keep their order; Index.sort_values has no kind (its ties
+    // are equal values anyway).
+    if (!index) kwargs.push(["kind", b.lit("stable")]);
     return b.callOp(nodeId, "sort_values", kwargs);
   };
-  const filterCell = (row: number, column: number, mode: "eq" | "ne") =>
+  // `row` counts in the order the clicked rows were fetched in, which can lag behind `sort`.
+  const filterCell = (row: number, column: number, mode: "eq" | "ne", order: WindowSort | null) =>
     rpc
-      .request<{ node: NodeInfo }>("table.filter_cell", sort ? { id: nodeId, row, column, mode, sort } : { id: nodeId, row, column, mode })
+      .request<{ node: NodeInfo }>("table.filter_cell", order ? { id: nodeId, row, column, mode, sort: order } : { id: nodeId, row, column, mode })
       .then(({ result }) => result.node);
 
   const item = (key: string, text: string, run: () => void) => (
@@ -87,8 +95,9 @@ export function TableView({ nodeId }: { nodeId: string }) {
   const menuItems = (m: Menu) => {
     const out = [];
     if (m.row !== undefined) {
-      out.push(item("eq", t("table.filter_eq", { value: m.text ?? "NaN" }), () => void create(filterCell(m.row as number, m.column, "eq"))));
-      out.push(item("ne", t("table.filter_ne", { value: m.text ?? "NaN" }), () => void create(filterCell(m.row as number, m.column, "ne"))));
+      const order = m.sort ?? null;
+      out.push(item("eq", t("table.filter_eq", { value: m.text ?? "NaN" }), () => void create(filterCell(m.row as number, m.column, "eq", order))));
+      out.push(item("ne", t("table.filter_ne", { value: m.text ?? "NaN" }), () => void create(filterCell(m.row as number, m.column, "ne", order))));
       out.push(
         item("copy", t("table.copy_value"), () => {
           void copyText(m.text ?? "");
@@ -163,10 +172,15 @@ export function TableView({ nodeId }: { nodeId: string }) {
             window={win.data}
             sort={sort}
             onSort={cycleSort}
-            onColumnMenu={(column, e) => setMenu({ x: e.clientX, y: e.clientY, column })}
-            onCellMenu={(row, column, e) =>
-              setMenu({ x: e.clientX, y: e.clientY, column, row, text: (e.currentTarget as HTMLElement).textContent })
-            }
+            // While another window loads, the rows on screen are not the ones the menus would act on.
+            onColumnMenu={(column, e) => {
+              if (!win.loading) setMenu({ x: e.clientX, y: e.clientY, column });
+            }}
+            onCellMenu={(row, column, e) => {
+              if (win.loading) return;
+              const text = (e.currentTarget as HTMLElement).textContent;
+              setMenu({ x: e.clientX, y: e.clientY, column, row, text, sort: win.data?.meta.sort ?? null });
+            }}
           />
         ) : (
           <div className="fl-muted">{t("app.loading")}</div>

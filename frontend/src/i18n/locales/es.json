@@ -416,7 +416,7 @@
   "member": {
     "required": "obligatorio",
     "default": "por defecto: {{value}}",
-    "help": "Solo se pasan los parámetros que completes; el resto queda como en pandas.",
+    "help": "Solo se pasan los parámetros que completes; el resto queda como en pandas. Un texto entre comillas (\"1\" o '1') se pasa como texto, no como número.",
     "missing": "Completá «{{name}}»",
     "bad_number": "«{{name}}» tiene que ser un número",
     "frame_none": "— elegí una tabla —"

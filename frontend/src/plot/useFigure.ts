@@ -16,6 +16,7 @@ export function useFigure(id: string) {
   const inflight = useRef(false);
   const queued = useRef<FigureSpec | null>(null);
   const current = useRef<FigureSpec | null>(null);
+  const accepted = useRef<FigureSpec | null>(null); // the last spec Python accepted
 
   const show = useCallback((next: FigureSpec) => {
     current.current = next;
@@ -24,6 +25,7 @@ export function useFigure(id: string) {
 
   const accept = useCallback(
     (state: FigureState) => {
+      accepted.current = state.spec;
       setServer(state);
       if (!queued.current) show(state.spec);
     },
@@ -43,7 +45,13 @@ export function useFigure(id: string) {
           setError(null);
           accept(result);
         })
-        .catch((err) => setError(message(err)))
+        .catch((err) => {
+          setError(message(err));
+          // Later edits clone the shown spec: go back to what Python holds, or every one of them
+          // would carry the rejected value. A queued draft was built on it too.
+          queued.current = null;
+          if (accepted.current) show(accepted.current);
+        })
         .finally(() => {
           inflight.current = false;
           const again = queued.current;
@@ -51,7 +59,7 @@ export function useFigure(id: string) {
           if (again) send(again);
         });
     },
-    [rpc, id, accept],
+    [rpc, id, accept, show],
   );
 
   const reload = useCallback(() => {

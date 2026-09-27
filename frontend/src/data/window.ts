@@ -8,6 +8,11 @@ export interface ColumnMeta {
   fallback: string | null;
 }
 
+export interface WindowSort {
+  column: number;
+  ascending: boolean;
+}
+
 export interface WindowMeta {
   offset: number;
   nrows_total: number;
@@ -15,6 +20,8 @@ export interface WindowMeta {
   col_start: number;
   columns: ColumnMeta[];
   index: ColumnMeta[];
+  /** the view-only order these rows were read in */
+  sort?: WindowSort | null;
 }
 
 export interface DecodedWindow {

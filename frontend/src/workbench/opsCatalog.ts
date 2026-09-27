@@ -89,7 +89,7 @@ export function parseValue(raw: unknown, dtype: string): Json {
   }
   if (isDate(dtype)) {
     if (text === "" || Number.isNaN(Date.parse(text))) throw new ValueError("date");
-    return { $: "ts", iso: text, tz: null };
+    return b.timestamp(text, dtype);
   }
   return text;
 }

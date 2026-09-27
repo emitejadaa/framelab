@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { NodeInfo } from "../generated/protocol";
 import { useAppStore } from "../state/context";
+import { dialogOpen } from "../state/store";
+import { isShortcut } from "../ui/keys";
 import { isPlottable } from "../workbench/plotting";
 import { blankLayer, useCatalog } from "./data";
 import { ExportDialog } from "./ExportDialog";
@@ -11,10 +13,6 @@ import { AxesPanel, FigurePanel, LayerPanel } from "./Panels";
 import { FigureCode, Preview } from "./Preview";
 import type { FigureSpec, LayerSpec, RenderMeta, Selection } from "./types";
 import { useFigure } from "./useFigure";
-
-function typing(target: EventTarget | null) {
-  return target instanceof HTMLElement && target.closest("input, textarea, select, [contenteditable]") !== null;
-}
 
 function Structure({
   spec,
@@ -115,6 +113,8 @@ export function PlotView({ figureId }: { figureId: string }) {
   const nodes = useMemo(() => allNodes ?? [], [allNodes]);
   const sources = useMemo(() => nodes.filter((n) => isPlottable(n.kind)), [nodes]);
   const selectedNode = useAppStore((s) => s.selectedId);
+  const modal = useAppStore(dialogOpen);
+  const box = useRef<HTMLDivElement>(null);
   const [selection, setSelection] = useState<Selection | null>(null);
   const [meta, setMeta] = useState<RenderMeta | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -140,7 +140,7 @@ export function PlotView({ figureId }: { figureId: string }) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey) || typing(e.target)) return;
+      if (!(e.ctrlKey || e.metaKey) || modal || exporting || !isShortcut(e, box.current)) return;
       const key = e.key.toLowerCase();
       if (key === "z" && !e.shiftKey) {
         e.preventDefault();
@@ -163,7 +163,7 @@ export function PlotView({ figureId }: { figureId: string }) {
 
   if (!spec || !server || !catalog || !selection) {
     return (
-      <div className="fl-plotview fl-muted fl-center-msg">
+      <div ref={box} className="fl-plotview fl-muted fl-center-msg">
         {figure.error ?? t("app.loading")}
       </div>
     );
@@ -223,7 +223,7 @@ export function PlotView({ figureId }: { figureId: string }) {
   }
 
   return (
-    <div className="fl-plotview" data-testid="plot-view">
+    <div ref={box} className="fl-plotview" data-testid="plot-view">
       <div className="fl-toolbar">
         <button type="button" className="fl-btn" onClick={showWorkbench}>
           ← {t("tabs.workbench")}

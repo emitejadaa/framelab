@@ -15,6 +15,8 @@ import { useTranslation } from "react-i18next";
 import { useRpc } from "../data/rpcContext";
 import type { NodeInfo } from "../generated/protocol";
 import { useAppStore } from "../state/context";
+import { dialogOpen } from "../state/store";
+import { isShortcut } from "../ui/keys";
 import { type FigureCardData, FigureCard } from "./FigureCard";
 import { isTabular } from "./format";
 import { layoutGraph, NODE_H, NODE_W } from "./layout";
@@ -33,10 +35,6 @@ function inside(box: RefObject<HTMLDivElement | null>, e: ReactMouseEvent | Mous
   return e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
 }
 
-function typing(target: EventTarget | null) {
-  return target instanceof HTMLElement && target.closest("input, textarea, select, [contenteditable]") !== null;
-}
-
 function CanvasInner() {
   const { t } = useTranslation();
   const rpc = useRpc();
@@ -50,6 +48,7 @@ function CanvasInner() {
   const askDelete = useAppStore((s) => s.askDelete);
   const askRename = useAppStore((s) => s.askRename);
   const history = useAppStore((s) => s.snapshot?.history);
+  const modal = useAppStore(dialogOpen);
   const moved = useRef<Record<string, { x: number; y: number }>>({});
   const dragStart = useRef<{ x: number; y: number } | null>(null);
   const tableBox = useRef<HTMLDivElement>(null);
@@ -143,7 +142,7 @@ function CanvasInner() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (typing(e.target)) return;
+      if (modal || !isShortcut(e, container.current)) return;
       const key = e.key.toLowerCase();
       if ((e.ctrlKey || e.metaKey) && (key === "z" || key === "y")) {
         e.preventDefault();

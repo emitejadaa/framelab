@@ -48,11 +48,14 @@ export function useMembers(nodeId: string | null, state: string): { members: Mem
   return out;
 }
 
-/** What the user typed, as a JSON value: "" is unset; true/false, None/null, numbers and JSON lists
- * or objects are recognised; anything else stays text. */
+/** What the user typed, as a JSON value: "" is unset; "text" or 'text' is that text (so "1" and ""
+ * can be passed); true/false, None/null, numbers and JSON lists or objects are recognised; anything
+ * else stays text. */
 export function parseLiteral(text: string): { set: boolean; value?: Json } {
   const raw = text.trim();
   if (raw === "") return { set: false };
+  const quoted = /^(["'])([\s\S]*)\1$/.exec(raw);
+  if (quoted) return { set: true, value: quoted[2] };
   if (/^(true|false)$/i.test(raw)) return { set: true, value: raw.toLowerCase() === "true" };
   if (/^(none|null)$/i.test(raw)) return { set: true, value: null };
   if (/^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/.test(raw)) return { set: true, value: Number(raw) };

@@ -18,6 +18,13 @@ export interface OpJson {
 
 /** A literal; `v` must already be a JSON scalar or an encoded scalar ({"$": ...}). */
 export const lit = (v: Json): Value => ({ t: "lit", v });
+/** An encoded pd.Timestamp for a datetime column. A tz-aware column ("datetime64[us, UTC]") only
+ * compares with timestamps in a zone, so the value takes the column's. */
+export const timestamp = (iso: string, dtype: string): Json => ({
+  $: "ts",
+  iso,
+  tz: /^datetime64\[\w+, (.+)\]$/.exec(dtype)?.[1] ?? null,
+});
 /** A column label of the target frame; `label` is the encoded label from node.summary. */
 export const colRef = (label: Json): Value => ({ t: "col", label });
 export const listOf = (items: Value[]): Value => ({ t: "list", items });

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { useRpc } from "../data/rpcContext";
@@ -21,6 +21,7 @@ export function DeleteDialog() {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const confirmButton = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     setPreview(null);
@@ -35,6 +36,11 @@ export function DeleteDialog() {
       alive = false;
     };
   }, [nodeId, rpc]);
+
+  // The button starts disabled (autoFocus skips it): focus it once there is something to confirm.
+  useEffect(() => {
+    if (preview) confirmButton.current?.focus();
+  }, [preview]);
 
   if (!nodeId || !portal) return null;
   const confirm = async () => {
@@ -57,7 +63,8 @@ export function DeleteDialog() {
         onMouseDown={(e) => e.stopPropagation()}
         onKeyDown={(e) => {
           if (e.key === "Escape") close(null);
-          if (e.key === "Enter" && preview) void confirm();
+          // Enter on a button presses that button (Cancel must not delete).
+          if (e.key === "Enter" && !(e.target instanceof HTMLButtonElement) && preview && !busy) void confirm();
         }}
       >
         <div className="fl-dialog-title">{t("delete.title", { name: preview?.names[0] ?? "…" })}</div>
@@ -76,9 +83,9 @@ export function DeleteDialog() {
             {t("form.cancel")}
           </button>
           <button
+            ref={confirmButton}
             type="button"
             className="fl-btn fl-btn-danger"
-            autoFocus
             disabled={!preview || busy}
             onClick={() => void confirm()}
           >

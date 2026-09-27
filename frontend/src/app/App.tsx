@@ -27,6 +27,44 @@ function focusRoot(event: PointerEvent<HTMLDivElement>) {
   if (!target.closest(INTERACTIVE)) event.currentTarget.focus({ preventScroll: true });
 }
 
+/**
+ * Closing a dialog or a view removes the focused button, and a button that becomes disabled (↶ at
+ * the end of the history) loses focus too: focus falls to <body>, where the app's shortcuts no
+ * longer see keys and host shortcuts wake up. Put it back on the root, unless the user had moved
+ * on to something outside the app.
+ */
+function keepFocus(root: HTMLElement): () => void {
+  let inside = false;
+  const onFocusIn = () => {
+    inside = true;
+  };
+  const away = (e: Event) => {
+    if (!e.composedPath().includes(root)) inside = false;
+  };
+  const restore = () => {
+    const active = document.activeElement;
+    if (inside && (active === null || active === document.body)) root.focus({ preventScroll: true });
+  };
+  // Chromium reports a removed or disabled element with a focusout to nowhere; Firefox only
+  // removes it silently, which the observer sees.
+  const onFocusOut = (e: FocusEvent) => {
+    if (e.relatedTarget === null) setTimeout(restore);
+  };
+  const observer = new MutationObserver(restore);
+  root.addEventListener("focusin", onFocusIn);
+  root.addEventListener("focusout", onFocusOut);
+  document.addEventListener("pointerdown", away, true);
+  document.addEventListener("focusin", away, true);
+  observer.observe(root, { childList: true, subtree: true });
+  return () => {
+    root.removeEventListener("focusin", onFocusIn);
+    root.removeEventListener("focusout", onFocusOut);
+    document.removeEventListener("pointerdown", away, true);
+    document.removeEventListener("focusin", away, true);
+    observer.disconnect();
+  };
+}
+
 function browserLanguages(): readonly string[] {
   return navigator.languages?.length ? navigator.languages : [navigator.language];
 }
@@ -35,6 +73,7 @@ export function App({ transport }: { transport: Transport }) {
   const [store] = useState(createAppStore);
   const [rpc] = useState(() => createRpc(transport));
   const [portalEl, setPortalEl] = useState<HTMLDivElement | null>(null);
+  const [rootEl, setRootEl] = useState<HTMLDivElement | null>(null);
   const snapshot = useStore(store, (s) => s.snapshot);
   const lang = pickLanguage(optionValue(snapshot, "general.language"), browserLanguages());
   const [initialLang] = useState(lang);
@@ -103,6 +142,8 @@ export function App({ transport }: { transport: Transport }) {
     };
   }, [rpc, store, transport]);
 
+  useEffect(() => (rootEl ? keepFocus(rootEl) : undefined), [rootEl]);
+
   const theme = (optionValue(snapshot, "general.theme") as string | undefined) ?? "system";
   const reduceMotion = optionValue(snapshot, "general.reduce_motion") === true;
 
@@ -112,6 +153,7 @@ export function App({ transport }: { transport: Transport }) {
       <I18nextProvider i18n={i18n}>
         <PortalProvider value={portalEl}>
           <div
+            ref={setRootEl}
             className="fl-root"
             tabIndex={-1}
             onPointerDown={focusRoot}

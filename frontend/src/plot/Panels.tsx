@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { useRpc } from "../data/rpcContext";
 import type { NodeInfo } from "../generated/protocol";
-import type { Json } from "../ops/build";
+import { type Json, timestamp } from "../ops/build";
 import {
   allFields,
   ColorBox,
@@ -181,7 +181,7 @@ function parseFilterValue(text: string, field: FieldInfo | undefined): Json {
   const raw = text.trim();
   if (field?.kind === "num" && raw !== "" && Number.isFinite(Number(raw))) return Number(raw);
   if (field?.kind === "bool" && /^(true|false)$/i.test(raw)) return raw.toLowerCase() === "true";
-  if (field?.kind === "date" && /^\d{4}-\d{2}-\d{2}/.test(raw)) return { $: "ts", iso: raw, tz: null };
+  if (field?.kind === "date" && /^\d{4}-\d{2}-\d{2}/.test(raw)) return timestamp(raw, field.dtype);
   return text;
 }
 
@@ -280,7 +280,14 @@ export function LayerPanel({
     const info = catalog.kinds.find((c) => c.key === k);
     const needsX = info?.x === "column" && !layer.x;
     const needsY = info?.y !== "all" && layer.y.length === 0;
-    if (!needsX && !needsY) return change((l) => void (l.kind = k));
+    if (!needsX && !needsY) {
+      // Python rejects properties the new kind does not have (line's linewidth on a bar).
+      const keep = new Set(info?.props.map((p) => p.key));
+      return change((l) => {
+        l.kind = k;
+        l.props = Object.fromEntries(Object.entries(l.props).filter(([key]) => keep.has(key)));
+      });
+    }
     const first = await guess(k, layer.source);
     replace(blankLayer({ ...first, x: layer.x ?? first.x, y: layer.y.length ? layer.y : first.y, label: layer.label }));
   };
