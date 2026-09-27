@@ -30,7 +30,10 @@ __all__ = [
 ]
 
 DEFAULT_ROOT_NAME = "df"
-RESERVED_NAMES = frozenset({"pd", "np", "plt", "mpl", "fl"}) | frozenset(dir(builtins))
+# pd/np/plt and the modules generated code may use (datetime/decimal literals).
+RESERVED_NAMES = frozenset({"pd", "np", "plt", "mpl", "fl", "datetime", "decimal"}) | frozenset(
+    dir(builtins)
+)
 _IPYTHON_NOISE = re.compile(r"^(_+|_\d+|_i+\d*|In|Out|_oh|_dh|_ih|exit|quit|get_ipython)$")
 
 

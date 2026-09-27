@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import keyword
+import unicodedata
 from collections.abc import Mapping
 from dataclasses import dataclass
 
@@ -166,8 +167,13 @@ def _expression(op: Op, names: Mapping[str, str]) -> str:
 
 
 def keyword_arg(key: str, value: str) -> str:
-    """``key=value`` when ``key`` is a valid keyword, else ``**{"key": value}``."""
-    if key.isidentifier() and not keyword.iskeyword(key):
+    """``key=value`` when ``key`` is a valid keyword, else ``**{"key": value}``.
+
+    Python normalizes identifiers (NFKC: ``nº`` becomes ``no``), so a label that changes under
+    NFKC must be written as a string to keep naming the same column.
+    """
+    stable = unicodedata.normalize("NFKC", key) == key
+    if key.isidentifier() and not keyword.iskeyword(key) and stable:
         return f"{key}={value}"
     return f"**{{{emit_literal(key)}: {value}}}"
 
@@ -183,7 +189,12 @@ def render_op(
         # Copy-on-Write: copy(deep=False) is equal and O(1); the user sees the idiom.
         executed = f"{result} = {base}.copy(deep=False)\n{assign}"
         if style.column_assign == "assign" and isinstance(op.key, str):
-            arg = keyword_arg(op.key, render_expr(op.expr, names, base))  # type: ignore[arg-type]
+            if isinstance(op.expr, AttrE):  # may be a method, which assign() would call
+                lam = "df" if "df" not in names.values() else "frame"
+                value = f"lambda {lam}: {render_expr(op.expr, names, lam)}"
+            else:
+                value = render_expr(op.expr, names, base)  # type: ignore[arg-type]
+            arg = keyword_arg(op.key, value)
             return Rendered(f"{result} = {base}.assign({arg})", executed)
         return Rendered(f"{result} = {base}.copy()\n{assign}", executed)
     code = f"{result} = {_expression(op, names)}"

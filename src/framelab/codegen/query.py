@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import keyword
 import math
+import unicodedata
 from typing import Any
 
 from ..ops.values import BoolE, CallE, Cmp, GetCol, ListV, Lit, NotE, This
@@ -15,14 +16,19 @@ class _NoQuery(Exception):
     pass
 
 
+def _plain_text(text: str) -> bool:
+    """Text query() can carry: printable, one line, unchanged by NFKC normalization."""
+    return text.isprintable() and unicodedata.normalize("NFKC", text) == text
+
+
 def _column(e: Any) -> str:
     if not (isinstance(e, GetCol) and isinstance(e.base, This) and isinstance(e.label, str)):
         raise _NoQuery
     label = e.label
+    if not label or not _plain_text(label) or any(c in label for c in "`\\"):
+        raise _NoQuery
     if label.isidentifier() and not keyword.iskeyword(label) and label != "index":
         return label
-    if not label or any(c in label for c in "`\n\\"):
-        raise _NoQuery
     return f"`{label}`"
 
 
@@ -33,7 +39,7 @@ def _literal(value: Any) -> str:
         return repr(value)
     if isinstance(value, float) and math.isfinite(value):
         return repr(value)
-    if isinstance(value, str) and not any(c in value for c in "'\"\\\n`@"):
+    if isinstance(value, str) and _plain_text(value) and not any(c in value for c in "'\"\\`@"):
         return f"'{value}'"
     raise _NoQuery
 

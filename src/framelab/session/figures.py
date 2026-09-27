@@ -112,6 +112,11 @@ class FigureStore:
         with self._lock:
             return [d.info() for d in self._docs.values()]
 
+    def sources(self, fid: str) -> list[str]:
+        """Node ids the figure's layers draw."""
+        with self._lock:
+            return self._doc(fid).sources()
+
     def names(self) -> set[str]:
         with self._lock:
             return {d.spec["name"] for d in self._docs.values()}

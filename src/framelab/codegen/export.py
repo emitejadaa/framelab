@@ -8,7 +8,7 @@ import pandas as pd
 
 from .. import __version__
 from .chain import chained_lines
-from .literals import label_text
+from .literals import emit_literal, label_text
 from .render import render_op
 from .script import pipeline_lines, used_modules
 from .style import CodeStyle, import_lines, restyle
@@ -18,11 +18,17 @@ __all__ = ["session_notebook", "session_script"]
 _FAILED = frozenset({"error", "blocked", "cancelled"})
 
 
+def _one_line(text: str) -> str:
+    """A label safe inside a ``#`` comment: escaped when it has line breaks or control chars."""
+    return text if text.isprintable() else emit_literal(text)
+
+
 def _requirement(session: Any, node: Any) -> str:
     value = session.wait(node.id)
     shape = " × ".join(map(str, node.shape or ()))
     labels = list(value.columns) if isinstance(value, pd.DataFrame) else [value.name]
-    shown = ", ".join(label_text(c) for c in labels[:5]) + (", …" if len(labels) > 5 else "")
+    shown = ", ".join(_one_line(label_text(c)) for c in labels[:5])
+    shown += ", …" if len(labels) > 5 else ""
     return f"{node.name} ({node.kind.value} {shape}: {shown})"
 
 
@@ -37,7 +43,14 @@ def _parts(session: Any, style: CodeStyle) -> tuple[list[str], list[str], list[s
             p for n in nodes if n.op is not None and n.id not in failed for p in n.op.parents()
         }
         leaves = [nid for nid in healthy if nid not in consumed]
-        lines = chained_lines(session, leaves, style, root_mode="step")
+        drawn = [
+            sid
+            for fid in session.plots.ids()
+            for sid in session.plots.sources(fid)
+            if sid in healthy and sid not in leaves
+        ]
+        targets = leaves + list(dict.fromkeys(drawn))  # figures read these variables
+        lines = chained_lines(session, targets, style, root_mode="step")
     else:
         lines = pipeline_lines(session, healthy, "step", style)
     names = session.variable_names()
