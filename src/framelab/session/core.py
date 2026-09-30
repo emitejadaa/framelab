@@ -909,6 +909,52 @@ class Session:
                     out.append({**member.describe(), "accessor": list(accessor)})
         return out
 
+    def combine_info(
+        self,
+        left: str,
+        right: str,
+        *,
+        left_on: list[Any] | None = None,
+        right_on: list[Any] | None = None,
+        left_index: bool = False,
+        right_index: bool = False,
+        timeout: float = 30.0,
+    ) -> dict[str, Any]:
+        """Before merging ``left`` with ``right``: exact rows per join type, repeated keys, the
+        relation and key dtypes pandas refuses. Keys are encoded labels (as summaries give them)."""
+        from ..engine.combine import describe_merge
+        from ..engine.guards import as_frame
+        from ..ops.values import decode_scalar, encode_scalar
+
+        lf = as_frame(self.wait(self._resolve(left), timeout))
+        rf = as_frame(self.wait(self._resolve(right), timeout))
+        if lf is None or rf is None:
+            raise BadRequest("combine needs two tables (DataFrame or Series)")
+
+        def labels(frame: pd.DataFrame, encoded: list[Any] | None) -> list[Any]:
+            out = [decode_scalar(e) for e in encoded or []]
+            missing = [x for x in out if x not in frame.columns]
+            if missing:
+                raise BadRequest(f"there is no column {missing[0]!r}")
+            return out
+
+        lk, rk = labels(lf, left_on), labels(rf, right_on)
+        nl = lf.index.nlevels if left_index else len(lk)
+        nr = rf.index.nlevels if right_index else len(rk)
+        kw: dict[str, Any] = {}
+        if nl or nr:
+            if nl != nr:
+                raise BadRequest("choose as many keys on each side")
+            if lk and lk == rk:
+                kw["on"] = lk
+            else:
+                kw.update(left_on=lk or None, right_on=rk or None)
+            kw.update(left_index=left_index, right_index=right_index)
+        out = describe_merge(lf, rf, kw)
+        shared = set(rf.columns)
+        out["common"] = [encode_scalar(c) for c in lf.columns if c in shared]
+        return out
+
     def summary(self, key: str, timeout: float = 30.0) -> dict:
         from ..table import summarize
 

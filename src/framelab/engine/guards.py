@@ -17,7 +17,16 @@ from ..errors import FramelabError
 from ..ops import Op
 from ..ops.values import Col, ListV, Lit, NodeRef
 
-__all__ = ["NUMERIC_AGGS", "Estimate", "GuardError", "check", "estimate"]
+__all__ = [
+    "NUMERIC_AGGS",
+    "Estimate",
+    "GuardError",
+    "MergeCounts",
+    "as_frame",
+    "check",
+    "estimate",
+    "merge_counts",
+]
 
 NUMERIC_AGGS = frozenset({"sum", "mean", "median", "std", "var", "sem", "prod", "skew", "quantile"})
 BYTES_PER_CELL = 8
@@ -79,14 +88,39 @@ def _key_counts(frame: pd.DataFrame, keys: list[Any], use_index: bool) -> pd.Ser
         return None
 
 
-def _merge(left: Any, right: Any, kw: Mapping[str, Any]) -> Estimate | None:
-    if isinstance(right, pd.Series):
-        right = right.to_frame()
-    if not isinstance(left, pd.DataFrame) or not isinstance(right, pd.DataFrame):
+@dataclass(frozen=True)
+class MergeCounts:
+    """Rows per key on each side of a merge: enough for exact row counts of every ``how``."""
+
+    left: pd.Series
+    right: pd.Series
+    shared: int  # key columns that come out once (same names on both sides)
+
+    def rows(self) -> dict[str, int]:
+        both = pd.concat([self.left.rename("l"), self.right.rename("r")], axis=1).fillna(0)
+        inner = int((both["l"] * both["r"]).sum())
+        left_only = int(both.loc[both["r"] == 0, "l"].sum())
+        right_only = int(both.loc[both["l"] == 0, "r"].sum())
+        return {
+            "inner": inner,
+            "left": inner + left_only,
+            "right": inner + right_only,
+            "outer": inner + left_only + right_only,
+        }
+
+
+def as_frame(value: Any) -> pd.DataFrame | None:
+    if isinstance(value, pd.Series):
+        return value.to_frame()
+    return value if isinstance(value, pd.DataFrame) else None
+
+
+def merge_counts(left: Any, right: Any, kw: Mapping[str, Any]) -> MergeCounts | None:
+    """Key counts for ``left.merge(right, **kw)`` (keys: ``on``/``left_on``/``right_on``/the
+    index); ``None`` when the keys cannot be worked out."""
+    left, right = as_frame(left), as_frame(right)
+    if left is None or right is None:
         return None
-    how = kw.get("how") or "inner"
-    if how == "cross":
-        return Estimate(len(left) * len(right), left.shape[1] + right.shape[1])
     left_index, right_index = bool(kw.get("left_index")), bool(kw.get("right_index"))
     on = _labels(kw.get("on"))
     lk = [] if left_index else _labels(kw.get("left_on")) or on
@@ -101,20 +135,22 @@ def _merge(left: Any, right: Any, kw: Mapping[str, Any]) -> Estimate | None:
     if lc is None or rc is None:
         return None
     rc.index = rc.index.set_names(lc.index.names)
-    both = pd.concat([lc.rename("l"), rc.rename("r")], axis=1).fillna(0)
-    inner = int((both["l"] * both["r"]).sum())
-    left_only = int(both.loc[both["r"] == 0, "l"].sum())
-    right_only = int(both.loc[both["l"] == 0, "r"].sum())
-    rows = {
-        "inner": inner,
-        "left": inner + left_only,
-        "right": inner + right_only,
-        "outer": inner + left_only + right_only,
-    }.get(how)
-    if rows is None:
-        return None
     by_name = not (left_index or right_index or kw.get("left_on") or kw.get("right_on"))
-    return Estimate(rows, left.shape[1] + right.shape[1] - (len(lk) if by_name else 0))
+    return MergeCounts(lc, rc, len(lk) if by_name else 0)
+
+
+def _merge(left: Any, right: Any, kw: Mapping[str, Any]) -> Estimate | None:
+    lf, rf = as_frame(left), as_frame(right)
+    if lf is None or rf is None:
+        return None
+    how = kw.get("how") or "inner"
+    if how == "cross":
+        return Estimate(len(lf) * len(rf), lf.shape[1] + rf.shape[1])
+    counts = merge_counts(lf, rf, kw)
+    rows = None if counts is None else counts.rows().get(how)
+    if counts is None or rows is None:
+        return None
+    return Estimate(rows, lf.shape[1] + rf.shape[1] - counts.shared)
 
 
 def _join(left: Any, other: Any, kw: Mapping[str, Any]) -> Estimate | None:

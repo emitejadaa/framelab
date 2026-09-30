@@ -115,6 +115,22 @@ def register_session_methods(dispatcher: Dispatcher) -> None:
     def preview(params: dict[str, Any], _buffers: list[bytes]) -> dict[str, Any]:
         return session.preview(op_from_json(params.get("op")), name=_name(params))
 
+    def combine_info(params: dict[str, Any], _buffers: list[bytes]) -> dict[str, Any]:
+        def keys(name: str) -> list[Any] | None:
+            value = params.get(name)
+            if value is not None and not isinstance(value, list):
+                raise BadRequest(f"{name} must be a list of column labels")
+            return value
+
+        return session.combine_info(
+            _str(params, "left"),
+            _str(params, "right"),
+            left_on=keys("left_on"),
+            right_on=keys("right_on"),
+            left_index=params.get("left_index") is True,
+            right_index=params.get("right_index") is True,
+        )
+
     def delete_preview(params: dict[str, Any], _buffers: list[bytes]) -> dict[str, Any]:
         return session.delete_preview(_id(params))
 
@@ -246,6 +262,7 @@ def register_session_methods(dispatcher: Dispatcher) -> None:
     dispatcher.register("graph.undo", lambda params, _b: {"done": session.undo()})
     dispatcher.register("graph.redo", lambda params, _b: {"done": session.redo()})
     dispatcher.register("node.delete_preview", delete_preview)
+    dispatcher.register("node.combine_info", combine_info)
     dispatcher.register("node.delete", delete)
     dispatcher.register("formula.parse", formula)
     dispatcher.register("node.apply", apply)
