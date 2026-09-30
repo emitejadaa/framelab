@@ -24,6 +24,12 @@ export interface MemberFormState {
   member: Member;
 }
 
+/** Combining ``left`` with ``right`` (dropped on it, or chosen in the dialog). */
+export interface CombineState {
+  left: string;
+  right: string | null;
+}
+
 export interface AppState {
   connection: ConnectionState;
   error: string | null;
@@ -39,6 +45,7 @@ export interface AppState {
   renaming: string | null;
   browser: string | null;
   memberForm: MemberFormState | null;
+  combining: CombineState | null;
   setConnection(connection: ConnectionState, error?: string | null): void;
   setHello(hello: HelloResult): void;
   setSnapshot(snapshot: SessionSnapshot): void;
@@ -56,13 +63,16 @@ export interface AppState {
   askRename(nodeId: string | null): void;
   openBrowser(nodeId: string | null): void;
   openMemberForm(form: MemberFormState | null): void;
+  openCombine(combine: CombineState | null): void;
 }
 
 export type AppStore = ReturnType<typeof createAppStore>;
 
 /** A modal dialog is open: view shortcuts (undo, delete, rename) must not act behind it. */
 export const dialogOpen = (s: AppState): boolean =>
-  s.deleting !== null || s.renaming !== null || s.form !== null || s.browser !== null || s.memberForm !== null;
+  s.deleting !== null || s.renaming !== null || s.form !== null || s.browser !== null ||
+  s.memberForm !== null ||
+  s.combining !== null;
 
 /** One store per mounted UI (never a module singleton: two widgets can share a page). */
 export function createAppStore() {
@@ -81,6 +91,7 @@ export function createAppStore() {
     renaming: null,
     browser: null,
     memberForm: null,
+    combining: null,
     setConnection: (connection, error = null) => set({ connection, error }),
     setHello: (hello) => set({ hello }),
     setSnapshot: (snapshot) =>
@@ -103,6 +114,7 @@ export function createAppStore() {
           renaming: s.renaming && nodes.has(s.renaming) ? s.renaming : null,
           browser: s.browser && nodes.has(s.browser) ? s.browser : null,
           memberForm: s.memberForm && nodes.has(s.memberForm.nodeId) ? s.memberForm : null,
+          combining: s.combining && nodes.has(s.combining.left) ? s.combining : null,
         };
       }),
     select: (selectedId) => set({ selectedId }),
@@ -138,5 +150,6 @@ export function createAppStore() {
     askRename: (renaming) => set({ renaming, menu: null }),
     openBrowser: (browser) => set({ browser, menu: null }),
     openMemberForm: (memberForm) => set({ memberForm, menu: null, browser: null }),
+    openCombine: (combining) => set({ combining, menu: null }),
   }));
 }

@@ -87,6 +87,22 @@ await created.waitFor({ state: "detached", timeout: 5000 }).catch(() => fail("Ct
 await page.keyboard.press("Control+y");
 await created.waitFor({ timeout: 5000 }).catch(() => fail("Ctrl+Y did not redo the new node"));
 
+// combine: menu -> Combinar con… -> ventas_head; the common columns become the keys
+await page.locator(".react-flow__controls-fitview").click();
+await page.waitForTimeout(400);
+await root.click({ button: "right" });
+await page.locator('[data-testid="menu-combine"]').click();
+const combine = page.locator('[data-testid="combine-dialog"]');
+await combine.locator('[data-testid="combine-right"]').selectOption({ label: "ventas_head (3 × 3)" });
+await combine.locator('[data-testid="combine-code"]', { hasText: 'ventas.merge(ventas_head, on=["pais", "monto", "n"], how="inner")' })
+  .waitFor({ timeout: 5000 })
+  .catch(() => fail("combine dialog did not preview the merge on the common columns"));
+await combine.locator('[data-testid="combine-how"] option', { hasText: "3 filas" }).first().waitFor({ state: "attached", timeout: 5000 })
+  .catch(() => fail("combine dialog did not show the row count"));
+await combine.locator('[data-testid="combine-apply"]').click();
+await page.locator('[data-testid="node-card"]', { hasText: "ventas_ventas_head" }).waitFor({ timeout: 10000 })
+  .catch(() => fail("merged node did not appear"));
+
 if (errors.length) await fail("console errors");
 console.log("OK");
 await browser.close();

@@ -25,6 +25,7 @@ export function NodeMenu() {
   const askRename = useAppStore((s) => s.askRename);
   const openBrowser = useAppStore((s) => s.openBrowser);
   const openMemberForm = useAppStore((s) => s.openMemberForm);
+  const openCombine = useAppStore((s) => s.openCombine);
   const select = useAppStore((s) => s.select);
   const node = useAppStore((s) => s.snapshot?.nodes.find((n) => n.id === s.menu?.nodeId) ?? null);
   const summary = useSummary(node?.id ?? null, node?.state ?? "");
@@ -170,6 +171,16 @@ export function NodeMenu() {
             {ready && isTabular(node.kind) ? (
               <button type="button" className="fl-menu-item" onClick={() => openTable(node.id)}>
                 ▦ {t("menu.open_table")}
+              </button>
+            ) : null}
+            {ready && (node.kind === "DataFrame" || node.kind === "Series") ? (
+              <button
+                type="button"
+                className="fl-menu-item"
+                data-testid="menu-combine"
+                onClick={() => openCombine({ left: node.id, right: null })}
+              >
+                ⋈ {t("menu.combine")}
               </button>
             ) : null}
             {ready && isPlottable(node.kind) ? (

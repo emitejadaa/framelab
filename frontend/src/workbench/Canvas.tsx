@@ -47,6 +47,7 @@ function CanvasInner() {
   const closeMenu = useAppStore((s) => s.closeMenu);
   const askDelete = useAppStore((s) => s.askDelete);
   const askRename = useAppStore((s) => s.askRename);
+  const openCombine = useAppStore((s) => s.openCombine);
   const history = useAppStore((s) => s.snapshot?.history);
   const modal = useAppStore(dialogOpen);
   const moved = useRef<Record<string, { x: number; y: number }>>({});
@@ -170,6 +171,19 @@ function CanvasInner() {
     }
   };
 
+  const combinable = (kind: string) => kind === "DataFrame" || kind === "Series";
+  /** The table card under the pointer when a card is dropped (not a mere overlap of cards). */
+  const dropTarget = (dragged: AnyNode, e: ReactMouseEvent | MouseEvent | TouchEvent): string | null => {
+    if (!("clientX" in e)) return null;
+    const scope = (container.current?.getRootNode() ?? document) as Document | ShadowRoot;
+    const card = scope
+      .elementsFromPoint(e.clientX, e.clientY)
+      .map((el) => el.closest(".react-flow__node"))
+      .find((el) => el !== null && el.getAttribute("data-id") !== dragged.id);
+    const target = nodes.find((n) => n.id === card?.getAttribute("data-id"));
+    return target && isNodeCard(target) && combinable(target.data.info.kind) ? target.id : null;
+  };
+
   const snapBack = (id: string) => {
     const back = dragStart.current;
     if (back) setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, position: back } : n)));
@@ -219,6 +233,11 @@ function CanvasInner() {
           } else if (inside(plotBox, e) && isPlottable(kind)) {
             snapBack(node.id);
             void plot(node.id);
+          } else if (combinable(kind) && dropTarget(node, e)) {
+            // a table dropped on another: combine them (the one below is the left side)
+            const target = dropTarget(node, e) as string;
+            snapBack(node.id);
+            openCombine({ left: target, right: node.id });
           } else {
             moved.current[node.id] = node.position;
           }

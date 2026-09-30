@@ -58,6 +58,12 @@ export const callOp = (target: string, name: string, kwargs: Kwargs = [], access
   kwargs,
   accessor,
 });
+/** A pandas function (``pd.concat``…); its node arguments go in ``args``. */
+export const funcOp = (name: string, args: Value[], kwargs: Kwargs = []): OpJson => ({
+  ...base("func", null, name),
+  args,
+  kwargs,
+});
 export const attrOp = (target: string, name: string, accessor: string[] = []): OpJson => ({
   ...base("attr", target, name),
   accessor,

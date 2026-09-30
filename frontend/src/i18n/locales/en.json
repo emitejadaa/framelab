@@ -12,7 +12,7 @@
     "rows": "{{count}} rows",
     "drop_table": "Table",
     "drop_plot": "Plot",
-    "hint": "Right-click a node to operate · double-click opens its table · drag it to ▦ Table or ▟ Chart · Delete removes it",
+    "hint": "Right-click a node to operate · double-click opens its table · drag it to ▦ Table or ▟ Chart, or onto another table to combine them · Delete removes it",
     "undo": "Undo",
     "redo": "Redo",
     "clear_failed": "Remove failed nodes"
@@ -45,7 +45,8 @@
     "retry": "Retry",
     "rename": "Rename…",
     "all_pandas": "All pandas operations…",
-    "pandas_matches": "pandas"
+    "pandas_matches": "pandas",
+    "combine": "Combine with…"
   },
   "inspector": {
     "empty": "Select a node",
@@ -420,5 +421,39 @@
     "missing": "Fill in “{{name}}”",
     "bad_number": "“{{name}}” must be a number",
     "frame_none": "— choose a table —"
+  },
+  "combine": {
+    "title": "Combine {{name}}",
+    "merge": "Join on keys",
+    "concat": "Stack",
+    "with": "With",
+    "choose_table": "— choose a table —",
+    "keys": "Keys (left = right)",
+    "choose_key": "— key —",
+    "index": "(index)",
+    "add_key": "key",
+    "how": "Join type",
+    "how_inner": "Only matching rows (inner)",
+    "how_left": "Every left row (left)",
+    "how_right": "Every right row (right)",
+    "how_outer": "Every row (outer)",
+    "how_cross": "Every pair (cross)",
+    "rows_one": "{{count}} row",
+    "rows_other": "{{count}} rows",
+    "validate": "Check the relation (validate)",
+    "validate_none": "Don't check",
+    "relation_one_to_one": "One to one (1:1)",
+    "relation_one_to_many": "One to many (1:m)",
+    "relation_many_to_one": "Many to one (m:1)",
+    "relation_many_to_many": "Many to many (m:m)",
+    "relation_found": "This data is: {{relation}}",
+    "indicator": "Add the _merge column (which side each row came from)",
+    "duplicates": "Repeated keys: {{left}} rows on the left and {{right}} on the right. Each repeat multiplies rows.",
+    "show_repeated": "Show the repeated rows of {{name}}",
+    "mismatch": "{{left}} ({{ldtype}}) and {{right}} ({{rdtype}}) cannot be joined: convert one of them with astype first.",
+    "stack": "Tables to stack after {{name}}",
+    "axis_rows": "One below the other",
+    "axis_columns": "Side by side",
+    "ignore_index": "Number the rows again (ignore_index)"
   }
 }

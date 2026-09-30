@@ -4,6 +4,7 @@ import { TableView } from "../table/TableView";
 import { PlotView } from "../plot/PlotView";
 import { Canvas } from "../workbench/Canvas";
 import { CodePanel } from "../workbench/CodePanel";
+import { CombineDialog } from "../workbench/CombineDialog";
 import { DeleteDialog } from "../workbench/DeleteDialog";
 import { MemberBrowser } from "../workbench/MemberBrowser";
 import { MemberForm } from "../workbench/MemberForm";
@@ -104,6 +105,7 @@ export function Shell() {
       <RenameDialog />
       <MemberBrowser />
       <MemberForm />
+      <CombineDialog />
     </div>
   );
 }

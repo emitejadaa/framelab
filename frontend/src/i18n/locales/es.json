@@ -12,7 +12,7 @@
     "rows": "{{count}} filas",
     "drop_table": "Tabla",
     "drop_plot": "Gráfico",
-    "hint": "Clic derecho en un nodo para operar · doble clic abre su tabla · arrastralo a ▦ Tabla o ▟ Gráfico · Supr lo borra",
+    "hint": "Clic derecho en un nodo para operar · doble clic abre su tabla · arrastralo a ▦ Tabla o ▟ Gráfico, o sobre otra tabla para combinarlas · Supr lo borra",
     "undo": "Deshacer",
     "redo": "Rehacer",
     "clear_failed": "Quitar nodos con error"
@@ -45,7 +45,8 @@
     "retry": "Reintentar",
     "rename": "Renombrar…",
     "all_pandas": "Todas las operaciones de pandas…",
-    "pandas_matches": "pandas"
+    "pandas_matches": "pandas",
+    "combine": "Combinar con…"
   },
   "inspector": {
     "empty": "Elegí un nodo",
@@ -420,5 +421,39 @@
     "missing": "Completá «{{name}}»",
     "bad_number": "«{{name}}» tiene que ser un número",
     "frame_none": "— elegí una tabla —"
+  },
+  "combine": {
+    "title": "Combinar {{name}}",
+    "merge": "Unir por claves",
+    "concat": "Apilar",
+    "with": "Con",
+    "choose_table": "— elegí una tabla —",
+    "keys": "Claves (izquierda = derecha)",
+    "choose_key": "— clave —",
+    "index": "(índice)",
+    "add_key": "clave",
+    "how": "Tipo de unión",
+    "how_inner": "Solo las que coinciden (inner)",
+    "how_left": "Todas las de la izquierda (left)",
+    "how_right": "Todas las de la derecha (right)",
+    "how_outer": "Todas (outer)",
+    "how_cross": "Todas con todas (cross)",
+    "rows_one": "{{count}} fila",
+    "rows_other": "{{count}} filas",
+    "validate": "Comprobar la relación (validate)",
+    "validate_none": "No comprobar",
+    "relation_one_to_one": "Uno a uno (1:1)",
+    "relation_one_to_many": "Uno a muchos (1:m)",
+    "relation_many_to_one": "Muchos a uno (m:1)",
+    "relation_many_to_many": "Muchos a muchos (m:m)",
+    "relation_found": "Estos datos son: {{relation}}",
+    "indicator": "Agregar la columna _merge (de qué lado vino cada fila)",
+    "duplicates": "Claves repetidas: {{left}} filas a la izquierda y {{right}} a la derecha. Cada repetición multiplica filas.",
+    "show_repeated": "Ver las repetidas de {{name}}",
+    "mismatch": "{{left}} ({{ldtype}}) y {{right}} ({{rdtype}}) no se pueden unir: convertí una de las dos con astype primero.",
+    "stack": "Tablas para apilar después de {{name}}",
+    "axis_rows": "Una debajo de otra",
+    "axis_columns": "Una al lado de otra",
+    "ignore_index": "Numerar las filas de nuevo (ignore_index)"
   }
 }

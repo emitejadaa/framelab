@@ -204,3 +204,6 @@
 .fl-root .fl-created { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-bottom: 1px solid var(--fl-border); background: color-mix(in srgb, var(--fl-accent) 8%, var(--fl-panel)); font-size: 12.5px; }
 .fl-root .fl-created .fl-btn { height: 24px; }
 .fl-root .fl-table-problem { padding: 6px 12px; }
+.fl-root .fl-combine { width: min(600px, calc(100vw - 32px)); }
+.fl-root .fl-combine-pair { display: grid; grid-template-columns: 1fr auto 1fr auto; align-items: center; gap: 6px; margin-bottom: 4px; }
+.fl-root .fl-combine-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }

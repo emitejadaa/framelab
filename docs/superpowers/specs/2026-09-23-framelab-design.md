@@ -428,6 +428,12 @@ cierra con verificación + borrado de tests de andamio + resumen breve al usuari
   en vivo, paleta, filtro y selección, combinar por arrastre + diálogo merge/join/concat con estimación,
   editar como nuevo, eliminar con lápidas, colapsar, minimapa, íconos de copiar en valores, tooltips, estados
   de carga y movimiento, i18n es/en de todo lo construido.
+  **Avance (2026-09-29):** todas las operaciones de pandas desde el menú (buscador por categorías +
+  formularios generados del catálogo); eliminar con deshacer; editar como nuevo; minimapa; diálogo
+  **Combinar** (menú "Combinar con…" o soltar una tabla sobre otra): merge por claves (columnas o índice)
+  con filas exactas por tipo de unión, claves repetidas con "ver las repetidas", relación para
+  `validate=`, claves de tipos incompatibles, `indicator`; y concat (filas/columnas, `ignore_index`).
+  Pendiente: paleta de comandos, colapsar cadenas, íconos de copiar en valores, tooltips de docs.
 - **M3 — Tabla.** Adaptador Glide, bloques Arrow + esqueletos, histogramas, panel de columna (+ funciones pd),
   menús de celda/fila/columna, orden visual + convertir, buscar, dividir, variantes, "abrir aquí".
   *Verificar:* E2E 4; scroll fluido de 5M filas mientras corre una op larga (benchmark/manual).

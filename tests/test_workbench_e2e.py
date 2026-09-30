@@ -51,6 +51,8 @@ def test_right_click_head_code_and_table(tmp_path):
         assert out.returncode == 0, out.stdout + out.stderr
         assert "ventas_head" in session
         pd.testing.assert_frame_equal(session["ventas_head"], ventas.head(3))
+        merged = session["ventas_ventas_head"]
+        pd.testing.assert_frame_equal(merged, ventas.merge(ventas.head(3), how="inner"))
     finally:
         server.stop()
         session.close()
